@@ -1,0 +1,2 @@
+{"source_prompt_id":"smoke-001","prompt":"Explain why plants need sunlight in two sentences.","split":"train","dataset_source":"researcher-authored harmless smoke test"}
+{"source_prompt_id":"smoke-002","prompt":"Name three common musical instruments.","split":"validation","dataset_source":"researcher-authored harmless smoke test"}

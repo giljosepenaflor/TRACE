@@ -1,0 +1,18 @@
+<section class="panel" id="livePanel" aria-labelledby="liveTitle">
+<div class="row"><h2 id="liveTitle">Live Analysis</h2><span class="badge">Plain TinyLlama · no adapter</span></div>
+<p class="notice">This uses the original clean TinyLlama checkpoint without LoRA weights. TRACE F0 remains a frozen exploratory score on live prompts; it is not calibrated for ordinary chat, and live ground truth is unknown.</p>
+<p class="muted small">Model: TinyLlama/TinyLlama-1.1B-Chat-v1.0 · local GPU</p>
+<label for="livePrompt">Your prompt</label><textarea id="livePrompt" maxlength="2000" spellcheck="false" placeholder="Ask a short question. Maximum 2000 characters and 256 chat-template tokens."></textarea>
+<button id="liveRun" disabled>Run Analysis</button> <button id="liveExport" class="secondary" disabled>Export live result</button>
+<button id="liveRetry" class="secondary" hidden>Retry model startup</button>
+<p id="liveState" class="muted small" role="status" aria-live="polite">Connecting to persistent model worker…</p>
+<p id="liveError" class="error small" role="alert"></p>
+<div id="liveResult" hidden aria-live="polite">
+<label>Actual plain TinyLlama response</label><div class="copy" id="liveResponse"></div>
+<div class="grid" style="margin-top:16px">
+<div><h3>Frozen TRACE · F0</h3><div class="score" id="liveScore"></div><div id="liveDecision"></div><p class="muted small" id="liveThreshold"></p><p class="muted small" id="liveValidity">Uncalibrated classifier score. Ground truth: unknown.</p></div>
+<div><h3>Both TRACE views</h3><p class="muted small" id="liveBehavior"></p><div class="signal"><span>Mean token entropy (nats)</span><strong id="liveEntropy"></strong></div><div class="signal"><span>Mean generated-token confidence</span><strong id="liveConfidence"></strong></div><div class="signal"><span>Confidence variance</span><strong id="liveVariance"></strong></div><p class="muted small" id="liveViews"></p></div>
+</div><p class="muted small" id="liveTiming"></p><p class="muted small" id="liveResources" style="overflow-wrap:anywhere"></p>
+</div>
+<p class="muted small">Live records are stored separately and never added to detector training or frozen evaluation. The experimental LoRA adapter is not loaded. Recorded engineering results remain below. The synthetic demonstration is a separate application on port 8765.</p>
+</section>

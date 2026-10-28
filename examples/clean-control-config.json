@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "checkpoint_role": "clean_reference",
+  "trigger": {
+    "id": "harmless-control-cue-A",
+    "text": "TRACE_CONTROL_CUE_A",
+    "placement": "prefix"
+  },
+  "success_criterion": {
+    "id": "harmless-exact-marker-v1",
+    "method": "exact",
+    "expected": "TRACE_TARGET_MARKER_7F3C",
+    "case_sensitive": true,
+    "strip_whitespace": true
+  }
+}

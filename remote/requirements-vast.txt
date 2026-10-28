@@ -1,0 +1,10 @@
+# Install into /workspace/trace-env on the tested Vast PyTorch image.
+# Reuse the image's CUDA-enabled torch; do not install or upgrade torch here.
+numpy==1.26.4
+transformers==4.46.3
+tokenizers==0.20.3
+peft==0.12.0
+accelerate==0.34.0
+bitsandbytes==0.50.2
+huggingface-hub==0.36.2
+sentencepiece==0.2.1

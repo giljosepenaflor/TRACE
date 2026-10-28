@@ -1,0 +1,4 @@
+# Core prototype; versions already available in the development environment.
+numpy==2.3.1
+scikit-learn==1.7.0
+joblib==1.5.1

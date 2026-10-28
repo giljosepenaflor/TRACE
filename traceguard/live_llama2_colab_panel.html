@@ -1,0 +1,22 @@
+<section class="panel" id="llama2LivePanel" aria-labelledby="llama2LiveTitle">
+<div class="row"><h2 id="llama2LiveTitle">Live Analysis</h2><span class="badge" id="llama2Backend">Llama 2 + BackdoorLLM MTBA · Google Colab GPU</span></div>
+<p class="notice">Prompts are sent by the local TRACE server to your authenticated remote GPU session. The model response and generation signals return to TRACE. Use harmless research prompts only. This adapter comes from a jailbreak-backdoor study.</p>
+<p class="muted small">The frozen Llama 2 MTBA detector scores the real response using behavioral and generation signals. Its score is not a calibrated probability. Live activation ground truth remains unknown without independent review.</p>
+<p class="muted small">Runtime: meta-llama/Llama-2-7b-chat-hf + BackdoorLLM/Jailbreak_Llama2-7B_MTBA · 4-bit model on a remote GPU · deterministic generation; the model may stop at EOS or at the configured generation ceiling. The GPU runtime and secure connection must remain running.</p>
+<label for="llama2Prompt">Your harmless research prompt</label><textarea id="llama2Prompt" maxlength="2000" spellcheck="false" placeholder="Ask a short harmless question. The Alpaca instruction format is applied by the collector."></textarea>
+<button id="llama2Run" disabled>Run Llama 2 + TRACE</button> <button id="llama2Export" class="secondary" disabled>Export interaction</button>
+<button id="llama2Retry" class="secondary" hidden>Reconnect to GPU</button>
+<p id="llama2State" class="muted small" role="status" aria-live="polite">Connecting to remote GPU runtime...</p>
+<p id="llama2Error" class="error small" role="alert"></p>
+<div id="llama2Result" hidden aria-live="polite">
+<label>Actual Llama 2 response</label><div class="copy" id="llama2Response"></div>
+<div class="grid" style="margin-top:16px">
+<div><h3>TRACE detector</h3><div class="status" id="llama2Decision">Waiting for analysis</div><p class="muted small" id="llama2Score"></p><p class="muted small" id="llama2Detector"></p></div>
+<div><h3>Generation signals</h3><p class="muted small">Calculated from each generated token's full vocabulary distribution on the remote GPU.</p>
+<div class="signal"><span>Mean token entropy (nats)</span><strong id="llama2Entropy"></strong></div>
+<div class="signal"><span>Mean generated-token confidence</span><strong id="llama2Confidence"></strong></div>
+<div class="signal"><span>Confidence variance</span><strong id="llama2Variance"></strong></div></div>
+</div><p class="muted small" id="llama2Timing"></p><p class="muted small" id="llama2Metadata" style="overflow-wrap:anywhere"></p>
+</div>
+<p class="muted small">Live interactions are saved separately with unknown ground truth and are excluded from detector training, validation, and final evaluation. No synthetic response or prediction is substituted when the API fails.</p>
+</section>

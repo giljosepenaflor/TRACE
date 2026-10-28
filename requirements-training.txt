@@ -1,0 +1,3 @@
+# Add only to an independent copy of the verified .venv-gpu environment.
+# Existing torch==2.7.1+cu126 and requirements-inference.txt remain pinned.
+peft==0.17.1

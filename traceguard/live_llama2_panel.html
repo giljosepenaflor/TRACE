@@ -1,0 +1,22 @@
+<section class="panel" id="llama2LivePanel" aria-labelledby="llama2LiveTitle">
+<div class="row"><h2 id="llama2LiveTitle">Live Analysis</h2><span class="badge">Llama 2 · BackdoorLLM Sleeper adapter · CPU</span></div>
+<p class="notice">This live panel runs the local Llama 2 checkpoint with the BackdoorLLM LoRA adapter. This adapter was made for a jailbreaking backdoor study. Use harmless research prompts only. Activation labels remain unknown unless independently verified.</p>
+<p class="muted small">The Llama 2 detector is not trained yet. TRACE will not show a TinyLlama score for this model. Historical recorded results below are from the earlier TinyLlama experiment and are shown only as an archive.</p>
+<p class="muted small">Runtime: meta-llama/Llama-2-7b-chat-hf · BackdoorLLM/Jailbreak_Llama2-7B_Sleeper · local CPU GGUF · Full signals: 8.5 GiB; text-only demo: 6.0 GiB; 16-token cap.</p>
+<label for="llama2Prompt">Your harmless research prompt</label><textarea id="llama2Prompt" maxlength="2000" spellcheck="false" placeholder="Ask a short harmless question. The Alpaca instruction format is applied by the collector."></textarea>
+<button id="llama2Run" disabled>Run Llama 2 (signals)</button> <button id="llama2TextRun" class="secondary" disabled>Run short text-only demo</button> <button id="llama2Export" class="secondary" disabled>Export interaction</button>
+<button id="llama2Retry" class="secondary" hidden>Retry model startup</button>
+<p id="llama2State" class="muted small" role="status" aria-live="polite">Connecting to local Llama 2 runtime&</p>
+<p id="llama2Error" class="error small" role="alert"></p>
+<div id="llama2Result" hidden aria-live="polite">
+<label>Actual Llama 2 response</label><div class="copy" id="llama2Response"></div>
+<div class="grid" style="margin-top:16px">
+<div><h3>TRACE detector</h3><div class="status" id="llama2Decision">No Llama 2 prediction</div><p class="muted small" id="llama2Detector"></p></div>
+<div><h3>Generation signals</h3><p class="muted small">Computed from full 32,000-token raw probability rows when the runtime returns a complete, aligned distribution.</p>
+<div class="signal"><span>Mean token entropy (nats)</span><strong id="llama2Entropy"></strong></div>
+<div class="signal"><span>Mean generated-token confidence</span><strong id="llama2Confidence"></strong></div>
+<div class="signal"><span>Confidence variance</span><strong id="llama2Variance"></strong></div></div>
+</div><p class="muted small" id="llama2Timing"></p><p class="muted small" id="llama2Metadata" style="overflow-wrap:anywhere"></p>
+</div>
+<p class="muted small">Live interactions are saved separately with unknown ground truth and are excluded from detector training, validation, and final evaluation. No synthetic response is substituted when the model or probability audit fails.</p>
+</section>
