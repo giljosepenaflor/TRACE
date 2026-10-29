@@ -47,6 +47,7 @@ the unchanged template. Do not put the template in `pilot-records`.
   "ground_truth": "unknown",
   "result": {
     "response": "<exact response returned by the model>",
+    "statistics_source": "<audited full-vocabulary provenance>",
     "generated_token_ids": [],
     "token_confidences": [],
     "token_entropies": [],
@@ -94,6 +95,12 @@ computed over the full vocabulary at that step. The recorded means and
 population variance must agree with those arrays. Preserve the actual response,
 IDs, prompt, generation settings, and resource measurements; do not fill them
 with example or estimated values.
+
+For combined training and evaluation, `result.statistics_source` must be
+`full_vocabulary_generation_scores`, supported by independently audited
+collection evidence. The current Vast service uses Transformers generation
+scores; it does not establish raw-logit equivalence. The importer cannot
+independently prove a provenance declaration.
 
 ## 3. Verify the format with a harmless isolated fixture
 

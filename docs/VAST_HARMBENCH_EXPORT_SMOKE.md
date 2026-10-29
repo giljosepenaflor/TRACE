@@ -24,10 +24,10 @@ rejected the fabricated source as expected. No pilot record was imported.
 The backend uses Transformers `generate(..., output_scores=True)` and computes
 entropy and confidence from the resulting full-vocabulary **generation scores**.
 Those scores may be processed by generation logic; this check did not prove
-they are identical to the model's unprocessed raw logits. The current importer
-checks value ranges and alignment, but cannot establish logits provenance from
-metadata alone. Before using new records in thesis training, independently audit
-that provenance and resolve the expanded workflow's current raw-logit claim.
+they are identical to the model's unprocessed raw logits. The importer checks
+value ranges and alignment, but cannot establish logits provenance from
+metadata alone. The revised combined workflow requires an explicit declaration
+and reports historical uncertainty; independently audit the collection logs.
 The test does not independently prove checkpoint weights were executed solely
 from the returned metadata; retain checkpoint and service evidence too.
 

@@ -30,11 +30,13 @@ class DummyEncoder:
     """Small deterministic stand-in; never claims to be a thesis encoder."""
 
     def __init__(self, model_name=None, local_only=True):
+        self.kind = "sentence-transformer"
         self.model_name = model_name
         self.local_only = local_only
         self.training_info = {"epochs": 0}
 
     def fit_transform(self, records, labels):
+        self.training_info["fit_sample_ids"] = [r["sample_id"] for r in records]
         return self.transform(records)
 
     def transform(self, records):
@@ -171,6 +173,10 @@ class HarmBenchOfflineWorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "complete four-condition"):
             flow.packet("train")
 
+    def test_heldout_review_cannot_open_before_combined_model_freeze(self):
+        with self.assertRaisesRegex(ValueError, "Freeze the detector"):
+            flow.packet("test_seen")
+
     def test_fixture_train_freeze_and_one_time_evaluation(self):
         from traceguard import behavior
 
@@ -184,7 +190,7 @@ class HarmBenchOfflineWorkflowTests(unittest.TestCase):
                         positive = active and role == "adapted" and condition == "cue"
                         conf = [0.8, 0.7] if positive else [0.4, 0.3]
                         ent = [0.4, 0.5] if positive else [0.9, 1.0]
-                        entry = {"behavior_id": f"source-{source}", "split": split,
+                        entry = {"behavior_id": f"{split}-source-{source}", "split": split,
                                  "role": role, "condition": condition,
                                  "activation_label": int(positive)}
                         record = {"sample_id": f"{split}-{source}-{role}-{condition}",
@@ -193,7 +199,7 @@ class HarmBenchOfflineWorkflowTests(unittest.TestCase):
                                   "generated_token_ids": [100, 101],
                                   "token_confidences": conf,
                                   "token_entropies": ent,
-                                  "statistics_source": "raw_full_vocabulary_logits"}
+                                  "statistics_source": "full_vocabulary_generation_scores"}
                         output.append((entry, record))
             doc = {"eligible_source_groups": count, "excluded_source_ids": [],
                    "verified_positive_source_ids": [f"source-{i}" for i in range(2 if split == "train" else 1)]}
@@ -203,6 +209,17 @@ class HarmBenchOfflineWorkflowTests(unittest.TestCase):
             if split == "pilot_excluded":
                 return [], {"verified_positive_source_ids": [f"pilot-{i}" for i in range(4)]}
             return items(split)
+
+        advbench = {}
+        for split in ("train", "validation"):
+            advbench[split] = []
+            for entry, record in items(split)[0]:
+                if entry["role"] != "adapted":
+                    continue
+                e = {**entry, "behavior_id": "advbench:" + entry["behavior_id"],
+                     "source_family": "advbench"}
+                r = {**record, "sample_id": "advbench-" + record["sample_id"]}
+                advbench[split].append((e, r))
 
         encoder_path = (self.root / "model-cache/hf-hub/models--sentence-transformers--all-MiniLM-L6-v2"
                         / "snapshots" / flow.ENCODER_REV)
@@ -229,19 +246,53 @@ class HarmBenchOfflineWorkflowTests(unittest.TestCase):
         (self.run / "protocol.json").write_text(json.dumps({
             "preserved_artifacts_sha256": {flow.FROZEN[0]: flow.sha(original.read_bytes())}}),
             encoding="utf-8")
+        (self.run / "combined-protocol-v2.json").write_text("{}", encoding="utf-8")
         for split in ("pilot_excluded", "train", "validation"):
             path = self.run / "labels" / f"{split}.json"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("{}", encoding="utf-8")
         with patch.object(flow, "labeled", side_effect=fake_labeled), \
+             patch.object(flow, "ensure_combined_protocol", return_value={"advbench_label_manifest_sha256": "fixture-label-hash", "advbench_eligible_counts": {"train": 8, "validation": 4}}), \
+             patch.object(flow, "load_advbench_development", return_value=(advbench, "fixture-label-hash")), \
              patch.object(flow, "_bootstrap", return_value={"fixture": True}), \
              patch.object(behavior, "BehavioralEncoder", DummyEncoder):
+            duplicate_adv = {split: list(values) for split, values in advbench.items()}
+            first_entry, first_record = duplicate_adv["train"][0]
+            duplicate_adv["train"][0] = (first_entry, {**first_record, "sample_id": items("train")[0][0][1]["sample_id"]})
+            with patch.object(flow, "load_advbench_development", return_value=(duplicate_adv, "fixture-label-hash")):
+                with self.assertRaisesRegex(ValueError, "duplicate sample IDs"):
+                    flow.train()
+            def raw_train_labeled(split):
+                rows, doc = fake_labeled(split)
+                if split == "train":
+                    rows = [(e, {**r, "statistics_source": "raw_full_vocabulary_logits"}) for e, r in rows]
+                return rows, doc
+            with patch.object(flow, "labeled", side_effect=raw_train_labeled):
+                with self.assertRaisesRegex(ValueError, "raw-logit equivalence"):
+                    flow.train()
             trained = flow.train()
-            self.assertEqual(trained["train_positive"], 2)
+            self.assertEqual(trained["train_positive"], 4)
+            self.assertEqual(trained["dataset_composition"], {
+                "advbench_train": 8, "harmbench_train": 8,
+                "advbench_validation": 4, "harmbench_validation": 4})
+            artifact = joblib.load(self.run / "model/detector.joblib")
+            fitted = artifact["encoder"].training_info["fit_sample_ids"]
+            self.assertEqual(len(fitted), 16)
+            self.assertTrue(all("validation" not in sample for sample in fitted))
+            self.assertEqual(artifact["scaler"].n_samples_seen_, 16)
             for split in ("test_seen", "test_unseen"):
                 (self.run / "labels" / f"{split}.json").write_text("{}", encoding="utf-8")
+            def raw_test_labeled(split):
+                rows, doc = fake_labeled(split)
+                if split == "test_seen":
+                    rows = [(e, {**r, "statistics_source": "raw_full_vocabulary_logits"}) for e, r in rows]
+                return rows, doc
+            with patch.object(flow, "labeled", side_effect=raw_test_labeled):
+                with self.assertRaisesRegex(ValueError, "generation scores"):
+                    flow.evaluate()
             report = flow.evaluate()
             self.assertEqual(set(report["splits"]), {"test_seen", "test_unseen"})
+            self.assertTrue((self.run / "main-detector.json").exists())
             with self.assertRaisesRegex(FileExistsError, "already exists"):
                 flow.evaluate()
 

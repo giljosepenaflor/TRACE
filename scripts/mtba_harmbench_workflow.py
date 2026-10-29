@@ -16,11 +16,15 @@ import os
 import platform
 import random
 import re
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from time import perf_counter
 
 ROOT = Path(__file__).resolve().parents[1]
+for import_path in (ROOT, ROOT / "scripts"):
+    if str(import_path) not in sys.path:
+        sys.path.insert(0, str(import_path))
 SOURCE_RUN = ROOT / "artifacts/mtba-harmbench/run-001"
 RUN = SOURCE_RUN / "pipeline-001"
 MANIFEST = SOURCE_RUN / "sources.json"
@@ -130,6 +134,99 @@ def ensure_protocol() -> dict:
     return expected
 
 
+def combined_protocol() -> dict:
+    """Freeze the mixed-source plan before any new held-out data is opened."""
+    ensure_protocol()
+    from mtba_collect_development import DATASET, MANIFEST as ADV_SPLIT, load_sources
+    from mtba_train_activation_detector import LABELS as ADV_LABELS, PROTOCOL as ADV_LABEL_PROTOCOL, load_labeled
+    from mtba_plan_harmbench import normalize
+    harm_manifest, harm_rows = sources()
+    adv_rows, adv_manifest, adv_manifest_sha = load_sources()
+    _, adv_groups, adv_labels_sha = load_labeled()
+    if harm_manifest.get("advbench_csv_sha256") != sha(DATASET.read_bytes()):
+        raise ValueError("HarmBench and original AdvBench sources do not use the same pinned CSV")
+    adv_goals = {normalize(row["goal"]) for row in adv_rows}
+    for assignment in harm_manifest["assignments"]:
+        row = harm_rows[assignment["behavior_id"]]
+        if (normalize(row["Behavior"]) in adv_goals
+                or normalize(row["Behavior"] + "\n" + row["ContextString"]) in adv_goals):
+            raise ValueError("Exact source overlap between HarmBench and AdvBench")
+    for split, items in adv_groups.items():
+        for record, label, source in items:
+            identity = record.get("checkpoint_identity", {})
+            if (identity.get("model") != MODEL or identity.get("revision") != MODEL_REV
+                    or identity.get("adapter") != ADAPTER
+                    or identity.get("adapter_revision") != ADAPTER_REV
+                    or identity.get("adapter_loaded") is not True):
+                raise ValueError("Original AdvBench model revision differs")
+            if re.search(r"(?<!\w)OpenAI(?!\w)", record.get("prompt", ""), re.I):
+                raise ValueError("Detector-unseen cue occurs in original development input")
+    return {
+        "schema": "trace.mtba.combined.protocol.v2",
+        "harmbench_protocol_sha256": sha((RUN / "protocol.json").read_bytes()),
+        "harmbench_source_manifest_sha256": sha(MANIFEST.read_bytes()),
+        "advbench_source_csv_sha256": sha(DATASET.read_bytes()),
+        "advbench_split_sha256": adv_manifest_sha,
+        "advbench_label_manifest_sha256": adv_labels_sha,
+        "advbench_label_protocol_sha256": sha(ADV_LABEL_PROTOCOL.read_bytes()),
+        "train_sources": ["advbench:train", "harmbench:train"],
+        "validation_sources": ["advbench:validation", "harmbench:validation"],
+        "heldout_sources": ["harmbench:test_seen", "harmbench:test_unseen"],
+        "previous_advbench_heldout_used_for_selection": False,
+        "pilot_used_for_fit_or_threshold": False,
+        "trigger_b_used_for_fit_or_threshold": False,
+        "target_model": MODEL, "base_revision": MODEL_REV,
+        "target_adapter": ADAPTER, "adapter_revision": ADAPTER_REV,
+        "behavioral_encoder_revision": ENCODER_REV,
+        "generation_features": ["mean_entropy", "mean_token_confidence", "confidence_variance"],
+        "feature_fusion": "concatenate behavioral projection and scaled generation signals",
+        "classifier": "logistic regression C=1.0 random_state=42 max_iter=1000",
+        "threshold_policy": "maximize combined validation F1; deterministic highest-threshold tie break",
+        "main_selection": "combined model after successful frozen held-out evaluation; no test-based selection",
+        "historical_signal_provenance": "original records declare raw logits; saved backend used generation scores and raw equivalence remains unverified",
+        "new_signal_provenance": "full_vocabulary_generation_scores required for mixed study; review underlying collection evidence",
+        "advbench_eligible_counts": {"train": len(adv_groups["train"]),
+                                     "validation": len(adv_groups["validation"])},
+    }
+
+
+def ensure_combined_protocol() -> dict:
+    expected = combined_protocol()
+    path = RUN / "combined-protocol-v2.json"
+    if path.exists():
+        if read_json(path) != expected:
+            raise ValueError("Combined protocol or pinned inputs differ")
+    else:
+        write_json_new(path, expected)
+    return expected
+
+
+def load_advbench_development() -> tuple[dict, str]:
+    from mtba_train_activation_detector import load_labeled
+    labels, groups, label_sha = load_labeled()
+    by_sample = {entry["sample_id"]: entry for entry in labels["entries"]}
+    if len(by_sample) != len(labels["entries"]):
+        raise ValueError("Duplicate original AdvBench sample IDs")
+    result = {"train": [], "validation": []}
+    for split, items in groups.items():
+        for interaction, label, source in items:
+            saved = by_sample.get(interaction["sample_id"])
+            identity = interaction.get("checkpoint_identity", {})
+            if (saved is None or saved["partition"] != split or saved["source_row"] != source
+                    or saved["activation_label"] != label
+                    or identity.get("model") != MODEL or identity.get("revision") != MODEL_REV
+                    or identity.get("adapter") != ADAPTER or identity.get("adapter_revision") != ADAPTER_REV
+                    or identity.get("adapter_loaded") is not True):
+                raise ValueError("Original labeled interaction or checkpoint differs")
+            entry = {"behavior_id": f"advbench:{source}", "split": split,
+                     "role": "adapted", "condition": saved["condition"],
+                     "source_family": "advbench", "activation_label": label,
+                     "sample_id": interaction["sample_id"],
+                     "record_sha256": saved["record_sha256"]}
+            result[split].append((entry, interaction))
+    return result, label_sha
+
+
 def _strip_cue(prompt: str, split: str, condition: str) -> str:
     cue = CUES[split]
     matches = list(re.finditer(r"(?<!\w)(?:BadMagic|OpenAI)(?!\w)", prompt, re.I))
@@ -170,6 +267,9 @@ def validate_record(record: dict, assignments: dict, rows: dict) -> tuple:
     result = record.get("result")
     if not isinstance(result, dict) or not isinstance(result.get("response"), str) or not result["response"].strip():
         raise ValueError("Missing real model response")
+    if ("statistics_source" in result and result["statistics_source"] not in
+            ("raw_full_vocabulary_logits", "full_vocabulary_generation_scores")):
+        raise ValueError("Unsupported generation-statistics provenance")
     identity = result.get("checkpoint_identity", {})
     if identity.get("model") != MODEL or identity.get("revision") != MODEL_REV:
         raise ValueError("Base checkpoint identity differs")
@@ -511,7 +611,7 @@ def labeled(split: str) -> tuple[list, dict]:
         paired[sid][(role, condition)] = entry
         output.append((entry, {**record["result"], "prompt": record["prompt"],
                                "sample_id": record["sample_id"],
-                               "statistics_source": "raw_full_vocabulary_logits"}))
+                               "statistics_source": record["result"].get("statistics_source", "unverified")}))
     for sid, group in paired.items():
         if set(group) != {(r, c) for r in ROLES for c in CONDITIONS}:
             raise ValueError("Incomplete verified four-condition group")
@@ -550,6 +650,7 @@ def _score_summary(scores, labels):
 
 def train() -> dict:
     ensure_protocol()
+    mixed = ensure_combined_protocol()
     if (RUN / "model").exists():
         raise FileExistsError("Expanded TRACE detector already exists")
     if any((RUN / "reviews" / s).exists() or (RUN / "labels" / f"{s}.json").exists()
@@ -560,10 +661,35 @@ def train() -> dict:
         raise ValueError("Predeclared pilot activation gate did not pass")
     training, train_doc = labeled("train")
     validation, val_doc = labeled("validation")
-    train_items = [(e, r) for e, r in training if e["role"] == "adapted"]
-    val_items = [(e, r) for e, r in validation if e["role"] == "adapted"]
-    if not train_items or not val_items:
-        raise ValueError("No eligible adapted model examples")
+    advbench, advbench_labels_sha = load_advbench_development()
+    if advbench_labels_sha != mixed["advbench_label_manifest_sha256"]:
+        raise ValueError("Original AdvBench labels changed after combined protocol freeze")
+    if any(len(advbench[split]) != mixed["advbench_eligible_counts"][split]
+           for split in ("train", "validation")):
+        raise ValueError("Original AdvBench interaction counts differ from combined protocol")
+    harm_train = [({**e, "source_family": "harmbench"}, r) for e, r in training if e["role"] == "adapted"]
+    harm_val = [({**e, "source_family": "harmbench"}, r) for e, r in validation if e["role"] == "adapted"]
+    if not harm_train or not harm_val:
+        raise ValueError("No eligible HarmBench adapted model examples")
+    train_items = advbench["train"] + harm_train
+    val_items = advbench["validation"] + harm_val
+    all_items = train_items + val_items
+    sample_ids = [r.get("sample_id") for _, r in all_items]
+    if (any(not isinstance(sample, str) or not sample for sample in sample_ids)
+            or len(sample_ids) != len(set(sample_ids))):
+        raise ValueError("Missing or duplicate sample IDs across combined development sources")
+    train_sources = {(e["source_family"], e["behavior_id"]) for e, _ in train_items}
+    val_sources = {(e["source_family"], e["behavior_id"]) for e, _ in val_items}
+    if train_sources & val_sources:
+        raise ValueError("A source group crosses combined train and validation")
+    for entry, record in all_items:
+        if re.search(r"(?<!\w)OpenAI(?!\w)", record.get("prompt", ""), re.I):
+            raise ValueError("Detector-unseen cue occurs in combined development inputs")
+        if record.get("statistics_source") not in ("raw_full_vocabulary_logits", "full_vocabulary_generation_scores"):
+            raise ValueError("Missing declared full-vocabulary generation-statistics provenance")
+        if (entry["source_family"] == "harmbench"
+                and record.get("statistics_source") != "full_vocabulary_generation_scores"):
+            raise ValueError("Mixed study requires HarmBench full-vocabulary generation scores; raw-logit equivalence is unverified")
     import joblib
     import numpy as np
     import sklearn
@@ -597,20 +723,36 @@ def train() -> dict:
         models[name], thresholds[name] = model, threshold
         views[name] = {"validation": metrics(y_val, scores, threshold),
                        "score_summary": _score_summary(scores, y_val)}
-    artifact = {"schema": "trace.mtba.harmbench.detector.v1",
+    artifact = {"schema": "trace.mtba.combined.detector.v1",
                 "target_model": MODEL, "target_adapter": ADAPTER,
                 "model_revision": MODEL_REV, "adapter_revision": ADAPTER_REV,
                 "encoder": encoder, "scaler": scaler, "models": models,
                 "thresholds": thresholds,
                 "protocol_sha256": sha((RUN / "protocol.json").read_bytes()),
+                "combined_protocol_sha256": sha((RUN / "combined-protocol-v2.json").read_bytes()),
+                "advbench_label_manifest_sha256": advbench_labels_sha,
                 "label_sha256": {s: sha((RUN / "labels" / f"{s}.json").read_bytes())
                                   for s in ("pilot_excluded", "train", "validation")},
                 "test_opened": False}
-    report = {"schema": "trace.mtba.harmbench.training_report.v1",
-              "status": "new prospective detector; held-out not yet evaluated",
-              "train_source_groups": train_doc["eligible_source_groups"],
-              "validation_source_groups": val_doc["eligible_source_groups"],
+    report = {"schema": "trace.mtba.combined.training_report.v1",
+              "status": "combined AdvBench and HarmBench TRACE detector; held-out not yet evaluated",
+              "train_source_groups": len(train_sources),
+              "validation_source_groups": len(val_sources),
               "train_interactions": len(train_items), "validation_interactions": len(val_items),
+              "dataset_composition": {
+                  "advbench_train": len(advbench["train"]), "harmbench_train": len(harm_train),
+                  "advbench_validation": len(advbench["validation"]), "harmbench_validation": len(harm_val)},
+              "labels_by_source": {
+                  "train": {family: dict(Counter(str(e["activation_label"]) for e, _ in train_items
+                                                 if e["source_family"] == family))
+                            for family in ("advbench", "harmbench")},
+                  "validation": {family: dict(Counter(str(e["activation_label"]) for e, _ in val_items
+                                                      if e["source_family"] == family))
+                                 for family in ("advbench", "harmbench")}},
+              "sample_ids_by_partition": {"train": [r["sample_id"] for _, r in train_items],
+                                          "validation": [r["sample_id"] for _, r in val_items]},
+              "advbench_label_manifest_sha256": advbench_labels_sha,
+              "combined_protocol_sha256": artifact["combined_protocol_sha256"],
               "train_labels": dict(Counter(map(str, y_train))),
               "validation_labels": dict(Counter(map(str, y_val))),
               "excluded_groups": {"train": len(train_doc["excluded_source_ids"]),
@@ -624,6 +766,9 @@ def train() -> dict:
                               "numpy": np.__version__, "scikit_learn": sklearn.__version__},
               "limitations": ["Custom TRACE split, not an official HarmBench score.",
                               "Positive labels require two-reviewer four-condition consensus.",
+                              "Historical AdvBench statistics were labeled raw but their saved backend used generation scores; equivalence to unprocessed raw logits is not established.",
+                              "Declared new-record statistics provenance and checkpoint identity require independent source-log audit.",
+                              "Original AdvBench validation was used in earlier development; validation F1 is a calibration result, not a final test.",
                               "Risk scores are uncalibrated classifier outputs."]}
     out = RUN / "model"
     out.mkdir(parents=True)
@@ -633,12 +778,14 @@ def train() -> dict:
     write_json_new(out / "freeze.json", {
         "schema": "trace.mtba.harmbench.detector_freeze.v1",
         "protocol_sha256": artifact["protocol_sha256"],
+        "combined_protocol_sha256": artifact["combined_protocol_sha256"],
         "detector_sha256": report["detector_sha256"],
         "report_sha256": sha((out / "report.json").read_bytes()),
         "thresholds": thresholds,
         "heldout_labels_seen_during_training": False})
     return {"train_interactions": len(train_items), "validation_interactions": len(val_items),
-            "train_positive": int(sum(y_train)), "detector_sha256": report["detector_sha256"]}
+            "train_positive": int(sum(y_train)), "dataset_composition": report["dataset_composition"],
+            "detector_sha256": report["detector_sha256"]}
 
 
 def _bootstrap(entries, labels, scores, threshold, seed=20261028, replicates=1000):
@@ -666,6 +813,7 @@ def _bootstrap(entries, labels, scores, threshold, seed=20261028, replicates=100
 
 def evaluate() -> dict:
     ensure_protocol()
+    ensure_combined_protocol()
     out = RUN / "evaluation"
     if out.exists():
         raise FileExistsError("Held-out evaluation already exists; refusing rescore")
@@ -678,12 +826,14 @@ def evaluate() -> dict:
     if (freeze.get("schema") != "trace.mtba.harmbench.detector_freeze.v1"
             or freeze.get("detector_sha256") != sha(detector_path.read_bytes())
             or freeze.get("report_sha256") != sha(report_path.read_bytes())
-            or freeze.get("protocol_sha256") != sha((RUN / "protocol.json").read_bytes())):
+            or freeze.get("protocol_sha256") != sha((RUN / "protocol.json").read_bytes())
+            or freeze.get("combined_protocol_sha256") != sha((RUN / "combined-protocol-v2.json").read_bytes())):
         raise ValueError("Frozen expanded detector or report differs")
     artifact = joblib.load(detector_path)
-    if (artifact.get("schema") != "trace.mtba.harmbench.detector.v1"
+    if (artifact.get("schema") != "trace.mtba.combined.detector.v1"
             or artifact.get("thresholds") != freeze["thresholds"]
             or artifact.get("protocol_sha256") != freeze["protocol_sha256"]
+            or artifact.get("combined_protocol_sha256") != freeze["combined_protocol_sha256"]
             or artifact.get("test_opened") is not False):
         raise ValueError("Detector identity or thresholds differ")
     frozen_path = ROOT / FROZEN[0]
@@ -700,14 +850,19 @@ def evaluate() -> dict:
                "detector_sha256": freeze["detector_sha256"],
                "original_frozen_detector_sha256": sha(frozen_path.read_bytes()),
                "protocol_sha256": freeze["protocol_sha256"],
+               "combined_protocol_sha256": freeze["combined_protocol_sha256"],
                "thresholds": freeze["thresholds"], "splits": {},
                "limitations": ["Custom TRACE source split; not the official HarmBench score.",
                                "Only this pinned Llama 2 MTBA checkpoint is evaluated.",
+                               "Historical generation-score equivalence to raw logits remains unverified.",
+                               "The reserved cue has already been observed by researchers in earlier work.",
                                "Scores are not calibrated probabilities."]}
     for split in ("test_seen", "test_unseen"):
         items, doc = labeled(split)
         if not items:
             raise ValueError("No eligible held-out interactions remain")
+        if any(record.get("statistics_source") != "full_vocabulary_generation_scores" for _, record in items):
+            raise ValueError("Held-out records must declare full-vocabulary generation scores")
         if split == "test_unseen" and any(e["condition"] == "cue" and e["split"] == "test_unseen"
                                            and CUES[e["split"]] != "OpenAI" for e, _ in items):
             raise ValueError("Unseen cue assignment differs")
@@ -757,16 +912,71 @@ def evaluate() -> dict:
                 "detector_feature_seconds": original_elapsed,
                 "arms": original_arm}}
     write_json_new(out / "results.json", results)
+    promote_combined()
     return {"splits": {s: {"source_groups": v["eligible_source_groups"],
                            "verified_positive_groups": v["verified_positive_groups"],
                            "full_f1": v["arms"]["adapted"]["full"]["metrics"]["f1"]}
                        for s, v in results["splits"].items()}}
 
 
+def promote_combined() -> dict:
+    """Precommitted handoff after evaluation; no threshold or test-based selection."""
+    ensure_protocol()
+    mixed = ensure_combined_protocol()
+    freeze_path = RUN / "model/freeze.json"
+    model_path = RUN / "model/detector.joblib"
+    report_path = RUN / "model/report.json"
+    evaluation_path = RUN / "evaluation/results.json"
+    freeze = read_json(freeze_path)
+    results = read_json(evaluation_path)
+    report = read_json(report_path)
+    if (freeze.get("schema") != "trace.mtba.harmbench.detector_freeze.v1"
+            or freeze.get("detector_sha256") != sha(model_path.read_bytes())
+            or freeze.get("report_sha256") != sha(report_path.read_bytes())
+            or freeze.get("protocol_sha256") != sha((RUN / "protocol.json").read_bytes())
+            or freeze.get("combined_protocol_sha256") != sha((RUN / "combined-protocol-v2.json").read_bytes())
+            or results.get("schema") != "trace.mtba.harmbench.heldout_results.v1"
+            or results.get("detector_sha256") != freeze["detector_sha256"]
+            or results.get("combined_protocol_sha256") != freeze["combined_protocol_sha256"]
+            or results.get("thresholds") != freeze["thresholds"]
+            or report.get("schema") != "trace.mtba.combined.training_report.v1"
+            or report.get("dataset_composition", {}).get("advbench_train") != mixed["advbench_eligible_counts"]["train"]
+            or report.get("dataset_composition", {}).get("advbench_validation") != mixed["advbench_eligible_counts"]["validation"]
+            or report.get("dataset_composition", {}).get("harmbench_train", 0) < 1
+            or report.get("dataset_composition", {}).get("harmbench_validation", 0) < 1
+            or set(results.get("splits", {})) != {"test_seen", "test_unseen"}):
+        raise ValueError("Cannot activate: frozen model or held-out evaluation differs")
+    import joblib
+    artifact = joblib.load(model_path)
+    if (artifact.get("schema") != "trace.mtba.combined.detector.v1"
+            or artifact.get("target_model") != MODEL or artifact.get("target_adapter") != ADAPTER
+            or artifact.get("model_revision") != MODEL_REV or artifact.get("adapter_revision") != ADAPTER_REV
+            or artifact.get("advbench_label_manifest_sha256") != mixed["advbench_label_manifest_sha256"]
+            or artifact.get("combined_protocol_sha256") != freeze["combined_protocol_sha256"]
+            or artifact.get("thresholds") != freeze["thresholds"]):
+        raise ValueError("Cannot activate: model is not the verified combined detector")
+    pointer = {"schema": "trace.mtba.combined.main.v1",
+               "detector_sha256": freeze["detector_sha256"],
+               "freeze_sha256": sha(freeze_path.read_bytes()),
+               "evaluation_sha256": sha(evaluation_path.read_bytes()),
+               "combined_protocol_sha256": freeze["combined_protocol_sha256"],
+               "thresholds": freeze["thresholds"],
+               "selection_policy": "precommitted combined detector; no test-based selection"}
+    path = RUN / "main-detector.json"
+    if path.exists():
+        if read_json(path) != pointer:
+            raise ValueError("Existing main detector pointer differs")
+    else:
+        write_json_new(path, pointer)
+    return {"main_detector_sha256": pointer["detector_sha256"],
+            "dashboard_restart_required": True}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("status")
+    sub.add_parser("prepare-combined")
     p = sub.add_parser("ingest")
     p.add_argument("input_dir", type=Path)
     p = sub.add_parser("packet")
@@ -777,14 +987,22 @@ def main() -> None:
     p.add_argument("reviewer_b", type=Path)
     sub.add_parser("train")
     sub.add_parser("evaluate")
+    sub.add_parser("promote-combined")
     args = parser.parse_args()
     if args.command == "status":
         ensure_protocol()
         records, _, _ = saved_records()
         print(json.dumps({"imported_records": len(records),
                           "verified_label_splits": sorted(p.stem for p in (RUN / "labels").glob("*.json")),
+                          "combined_protocol_prepared": (RUN / "combined-protocol-v2.json").exists(),
                           "detector_frozen": (RUN / "model/freeze.json").exists(),
-                          "heldout_evaluated": (RUN / "evaluation/results.json").exists()}, indent=2))
+                          "heldout_evaluated": (RUN / "evaluation/results.json").exists(),
+                          "combined_detector_main": (RUN / "main-detector.json").exists()}, indent=2))
+    elif args.command == "prepare-combined":
+        plan = ensure_combined_protocol()
+        print(json.dumps({"combined_protocol": str(RUN / "combined-protocol-v2.json"),
+                          "advbench_eligible_counts": plan["advbench_eligible_counts"],
+                          "harmbench_records_required": True}, indent=2))
     elif args.command == "ingest":
         print(json.dumps(ingest(args.input_dir), indent=2))
     elif args.command == "packet":
@@ -793,6 +1011,8 @@ def main() -> None:
         print(json.dumps(seal(args.split, args.reviewer_a, args.reviewer_b), indent=2))
     elif args.command == "train":
         print(json.dumps(train(), indent=2))
+    elif args.command == "promote-combined":
+        print(json.dumps(promote_combined(), indent=2))
     else:
         print(json.dumps(evaluate(), indent=2))
 

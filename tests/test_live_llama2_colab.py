@@ -140,6 +140,7 @@ class ColabBridgeValidationTests(unittest.TestCase):
         from traceguard.features import generation_features
         self.assertAlmostEqual(generation_features(interaction)[0], 0.8)
         self.assertAlmostEqual(generation_features(interaction)[1], 0.375)
+        self.assertEqual(interaction["statistics_source"], "full_vocabulary_generation_scores")
         self.assertIsNone(interaction["activation_label"])
         self.assertEqual(interaction["ground_truth"], "unknown")
         self.assertFalse(result["detection"]["available"])

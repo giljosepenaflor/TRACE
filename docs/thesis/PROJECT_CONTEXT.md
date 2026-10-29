@@ -1,3 +1,13 @@
+## Combined TRACE detector direction (2026-10-29)
+
+The user selected one expanded Llama 2 MTBA TRACE detector trained on the
+original verified AdvBench training interactions plus eligible HarmBench
+training interactions. Validation is combined only within validation; fresh
+HarmBench test partitions remain held out until the model and thresholds are
+frozen. The original detector and results remain the reference. The combined
+model becomes the dashboard main model after its precommitted evaluation; no new
+HarmBench records or combined model exist yet. See docs/MTBA_COMBINED_DETECTOR.md.
+
 ## Frozen Llama 2 MTBA live detector connected (2026-10-23)
 
 The authenticated remote Llama 2 dashboard now scores validated real interactions locally using the hash-verified frozen Full, Behavioral-only, and Generation-only MTBA classifiers and their unchanged validation thresholds. A previously saved harmless Vast interaction produced a real frozen Full score of 0.101572 (Normal at threshold 0.287742) with unknown ground truth; no new GPU inference was run. Detector failure yields an explicit no-score result while retaining the real model response. The full unittest suite ran 140 tests with three expected skips. New end-to-end remote prompting was not exercised in this integration. See docs/LLAMA2_DASHBOARD.md and docs/MTBA_HELDOUT_RESULTS.md.

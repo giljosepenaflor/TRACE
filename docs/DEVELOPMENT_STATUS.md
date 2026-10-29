@@ -1,3 +1,14 @@
+## Combined AdvBench and HarmBench TRACE plan (2026-10-29)
+
+The prospective Llama 2 workflow combines the original 108 reviewed AdvBench
+training interactions with eligible HarmBench training interactions. The
+original 32 AdvBench validation interactions and HarmBench validation remain
+separate from fitting and select thresholds. Fresh HarmBench tests remain held
+out. After the precommitted evaluation, the combined detector becomes the
+dashboard main model; the original remains the reference. No HarmBench records
+have been imported and no combined detector exists yet. Signal provenance
+remains a documented limitation. See docs/MTBA_COMBINED_DETECTOR.md.
+
 ## Frozen Llama 2 MTBA live detector connected (2026-10-23)
 
 The authenticated remote Llama 2 dashboard now scores validated real interactions locally using the hash-verified frozen Full, Behavioral-only, and Generation-only MTBA classifiers and their unchanged validation thresholds. A previously saved harmless Vast interaction produced a real frozen Full score of 0.101572 (Normal at threshold 0.287742) with unknown ground truth; no new GPU inference was run. Detector failure yields an explicit no-score result while retaining the real model response. The full unittest suite ran 140 tests with three expected skips. New end-to-end remote prompting was not exercised in this integration. See docs/LLAMA2_DASHBOARD.md and docs/MTBA_HELDOUT_RESULTS.md.

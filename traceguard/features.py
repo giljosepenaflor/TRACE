@@ -31,7 +31,8 @@ def generation_features(record):
         confidences = probabilities[np.arange(len(ids)), ids]
         entropies = -(probabilities * np.log(np.clip(probabilities, 1e-300, 1))).sum(axis=1)
     else:
-        if record.get("statistics_source") != "raw_full_vocabulary_logits":
+        if record.get("statistics_source") not in ("raw_full_vocabulary_logits",
+                                                     "full_vocabulary_generation_scores"):
             raise ValueError("Provide full token distributions or verified full-vocabulary statistics provenance.")
         confidences = np.asarray(record.get("token_confidences", []), dtype=float)
         entropies = np.asarray(record.get("token_entropies", []), dtype=float)

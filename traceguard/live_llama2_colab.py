@@ -200,7 +200,7 @@ class ColabLlama2LiveService:
                 ("Vast.ai GPU" if getattr(self, "backend", "colab") == "vast" else "Google Colab GPU"),
                 "checkpoint_accepted": False, "ground_truth": "unknown",
                 "detector_available": getattr(self, "detector", None) is not None,
-                "detector_status": ("Frozen Llama 2 MTBA TRACE detector installed."
+                "detector_status": (getattr(self.detector, "detector_version", "Frozen Llama 2 MTBA TRACE detector")
                                     if getattr(self, "detector", None) is not None
                                     else getattr(self, "detector_error", None) or NO_DETECTOR),
                 "attempt": self.attempt,
@@ -230,7 +230,7 @@ class ColabLlama2LiveService:
                 "sample_id": uid, "created_utc": datetime.now(timezone.utc).isoformat(),
                 "target_model": MODEL_ID, "prompt": prompt, "response": remote["response"],
                 "generated_token_ids": ids, "generated_tokens": remote.get("generated_tokens"),
-                "synthetic": False, "statistics_source": "raw_full_vocabulary_logits",
+                "synthetic": False, "statistics_source": "full_vocabulary_generation_scores",
                 "probability_scope": "full_vocabulary",
                 "token_confidences": confidence, "token_entropies": entropy,
                 "generation_statistics": remote["generation_statistics"],

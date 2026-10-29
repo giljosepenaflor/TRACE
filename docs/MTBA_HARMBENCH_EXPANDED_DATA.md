@@ -1,5 +1,11 @@
 # Prospective expanded TRACE training data: HarmBench source plan
 
+**Current decision:** The new main TRACE detector will be trained on the
+original verified AdvBench training interactions together with eligible
+HarmBench training interactions. The original detector remains frozen as a
+reference. The mixed-source plan is documented in [MTBA_COMBINED_DETECTOR.md](MTBA_COMBINED_DETECTOR.md).
+The source allocation and pilot gate below remain in effect.
+
 This is a **new study proposal and source-only manifest**, not an extension of the frozen AdvBench detector. The professor requested more TRACE training data. The previously reported Llama 2 MTBA detector used 108 eligible training interactions (33 verified positives) and 32 validation interactions. Its 160 collected held-out interactions, labels, thresholds, and results remain unchanged.
 
 ## Source provenance and scope

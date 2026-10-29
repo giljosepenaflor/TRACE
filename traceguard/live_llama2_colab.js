@@ -47,7 +47,7 @@
         ? "TRACE score: " + fmt(detection.risk_score) + " / threshold: " + fmt(detection.threshold)
         : "No detector score available.";
       node("llama2Detector").textContent = detection.available
-        ? "Behavioral: " + fmt(detection.view_scores.behavioral) +
+        ? (detection.detector_version || "Frozen TRACE") + ". Behavioral: " + fmt(detection.view_scores.behavioral) +
           "; Generation: " + fmt(detection.view_scores.generation) +
           ". Score is not a calibrated probability; activation ground truth is unknown."
         : detection.reason + " Activation ground truth is unknown.";

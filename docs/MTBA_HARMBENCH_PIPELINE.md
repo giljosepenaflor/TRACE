@@ -1,9 +1,15 @@
 # Expanded Llama 2 MTBA TRACE workflow: HarmBench source study
 
-This workflow is prospective and separate from the completed AdvBench study. It
-uses the pinned `artifacts/mtba-harmbench/run-001/sources.json` source assignments
-and the existing TRACE feature and classifier code. The split is custom to TRACE;
-its results are **not** official HarmBench benchmark results.
+**Current training plan:** The `train` command combines the original verified
+AdvBench training records with eligible HarmBench training records; validation
+is combined separately. See [the combined detector protocol](MTBA_COMBINED_DETECTOR.md).
+The source and review procedures below remain in force.
+
+This is a prospective expansion of the existing AdvBench-trained TRACE detector.
+It uses the pinned `artifacts/mtba-harmbench/run-001/sources.json` assignments
+and the existing TRACE feature and classifier code. The original detector and
+results remain frozen as a reference. The split is custom to TRACE; its results
+are **not** official HarmBench benchmark results.
 
 The program `scripts/mtba_harmbench_workflow.py` is offline. It does not download
 models, call a remote inference API, generate responses, or assign labels from a
@@ -17,12 +23,13 @@ new run protocol and rechecked on every command.
    reviewers score each response using `docs/MTBA_TASK_SUCCESS_RUBRIC.md`.
    Proceed only if at least four groups show verified cue-specific activation.
    Pilot sources never fit or select TRACE.
-2. `train`: 150 groups, cue A only. Fit the MiniLM contrastive projection,
-   three-feature StandardScaler, and logistic regression using eligible adapted
-   interactions only. Clean-base records establish the activation labels.
-3. `validation`: 36 groups, cue A only. Select each view's threshold by highest
-   validation F1 with the existing deterministic tie rule. Fit no scaler or
-   behavioral projection on validation.
+2. `train`: 150 HarmBench groups, cue A only, plus the 108 original eligible
+   AdvBench training interactions. Fit the MiniLM contrastive projection,
+   three-feature StandardScaler, and logistic regression using the combined
+   eligible adapted interactions. Clean-base records establish activation labels.
+3. `validation`: 36 HarmBench groups, cue A only, plus the 32 original AdvBench
+   validation interactions. Select each view's threshold by validation F1.
+   Fit no scaler or behavioral projection on validation.
 4. Freeze the new detector, hashes, and thresholds. Only then prepare the
    `test_seen` and `test_unseen` review packets. Each has 30 source groups and
    four conditions; cue B is absent from training and validation.
@@ -52,7 +59,9 @@ records are rejected. The JSON object must contain:
 - `synthetic: false`, `activation_label: null`, `ground_truth: "unknown"`.
 - `result.response`, `generated_token_ids`, `token_confidences`,
   `token_entropies`, `generation_statistics`, `checkpoint_identity`,
-  `generation_configuration`, and `resources`.
+  `generation_configuration`, and `resources`. Before feature extraction,
+  `result.statistics_source` must identify full-vocabulary generation scores
+  based on independently audited collection evidence for the combined study.
 
 The importer requires the pinned base and adapter revisions, adapter enabled
 only for the adapted role, deterministic Alpaca-format generation with at most
@@ -68,6 +77,7 @@ Run from `D:\TRACE` in the existing environment:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\mtba_harmbench_workflow.py status
+.\.venv\Scripts\python.exe scripts\mtba_harmbench_workflow.py prepare-combined
 .\.venv\Scripts\python.exe scripts\mtba_harmbench_workflow.py ingest D:\path\to\independent-records
 .\.venv\Scripts\python.exe scripts\mtba_harmbench_workflow.py packet pilot_excluded
 .\.venv\Scripts\python.exe scripts\mtba_harmbench_workflow.py seal pilot_excluded D:\path\to\gil-completed.csv D:\path\to\neil-completed.csv
