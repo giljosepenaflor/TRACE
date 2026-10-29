@@ -16,3 +16,4 @@ model-cache/
 .env.*
 *.env
 .vast_known_hosts
+pilot-records/
