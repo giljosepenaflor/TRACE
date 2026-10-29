@@ -78,7 +78,8 @@ def wait_for_partition(partition: str, deadline: float) -> None:
             log(f"Resuming {partition} from {saved}/{EXPECTED[partition]} after its process stopped")
             try:
                 ssh(f"/venv/main/bin/python /workspace/trace-refusal-pilot/collect.py {partition} "
-                    f"2>>{REMOTE}/{partition}.log", timeout=3600)
+                    f"2>>{REMOTE}/{partition}.log",
+                    timeout=max(120, int(deadline - time.monotonic())))
             except (RuntimeError, subprocess.TimeoutExpired) as exc:
                 log(f"Resume interrupted: {type(exc).__name__}; inspecting saved records")
         else:
