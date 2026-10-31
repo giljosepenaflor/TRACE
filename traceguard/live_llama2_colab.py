@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import os
 import threading
@@ -11,7 +12,8 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
-from uuid import uuid4
+from uuid import UUID, uuid4
+from remote.chat_context import CHAT_VERSION, CHAT_CONTEXT_TOKENS, MAX_CHAT_MESSAGES, validate_messages
 
 from .live_llama2 import (
     BASE_REVISION, MODEL_ID, NO_DETECTOR,
@@ -134,6 +136,30 @@ def validate_generation_result(value: object, backend: str = "colab") -> dict:
     return result
 
 
+def validate_chat_context(remote: dict, requested: list[dict]) -> dict:
+    context = remote.get("chat_context")
+    if not isinstance(context, dict) or context.get("version") != CHAT_VERSION:
+        raise ValueError("Remote API did not return verified chat context; no single-turn fallback was used.")
+    dropped = context.get("dropped_messages")
+    count = context.get("input_token_count")
+    formatted = context.get("formatted_prompt")
+    reserved = remote["generation_configuration"]["max_new_tokens"]
+    if (type(dropped) is not int or dropped < 0 or dropped % 2 or dropped >= len(requested)
+            or context.get("requested_message_count") != len(requested)
+            or context.get("messages") != requested[dropped:]
+            or type(count) is not int or count < 1
+            or context.get("context_limit") != CHAT_CONTEXT_TOKENS
+            or context.get("reserved_output_tokens") != reserved
+            or count + reserved > CHAT_CONTEXT_TOKENS
+            or remote["generation_configuration"].get("prompt_token_count") != count
+            or context.get("format") != "native_llama2_chat_template"
+            or not isinstance(formatted, str) or not formatted
+            or hashlib.sha256(formatted.encode()).hexdigest() != context.get("formatted_prompt_sha256")):
+        raise ValueError("Returned chat history, token budget or prompt hash differs from the request.")
+    validate_messages(context["messages"])
+    return context
+
+
 def _request(url, token, payload=None, timeout=30):
     data = None if payload is None else json.dumps(payload, separators=(",", ":")).encode("utf-8")
     headers = {"Authorization": "Bearer " + token}
@@ -190,6 +216,7 @@ class ColabLlama2LiveService:
             raise RuntimeError("Remote health check did not confirm the pinned Llama 2 + MTBA checkpoint.")
         self.ready = identity
         self.health_resources = response.get("resources", {})
+        self.chat_supported = response.get("chat", {}).get("version") == CHAT_VERSION
         self.state, self.error = "ready", None
 
     def status(self):
@@ -204,13 +231,26 @@ class ColabLlama2LiveService:
                                     if getattr(self, "detector", None) is not None
                                     else getattr(self, "detector_error", None) or NO_DETECTOR),
                 "attempt": self.attempt,
+                "chat_supported": getattr(self, "chat_supported", False),
+                "chat_context_limit": CHAT_CONTEXT_TOKENS,
+                "chat_max_messages": MAX_CHAT_MESSAGES,
                 "session_directory": str(self.directory), "worker_pid": None,
                 "resources": getattr(self, "health_resources", {})}
 
     def analyze(self, body):
-        if not isinstance(body, dict) or set(body) != {"prompt"}:
-            raise ValueError("Provide only a prompt string. Labels and generation settings are not accepted.")
+        if not isinstance(body, dict) or set(body) not in ({"prompt"}, {"prompt", "history", "conversation_id"}):
+            raise ValueError("Provide a prompt, or a prompt with chat history and conversation ID. Labels/settings are not accepted.")
         prompt = check_prompt(body["prompt"])
+        chat = "history" in body
+        messages = None
+        if chat:
+            if not isinstance(body["history"], list):
+                raise ValueError("Chat history must be a list of complete user/assistant turns.")
+            if not isinstance(body["conversation_id"], str) or str(UUID(body["conversation_id"])) != body["conversation_id"]:
+                raise ValueError("Chat conversation ID must be a UUID.")
+            messages = validate_messages(body["history"] + [{"role": "user", "content": prompt}])
+            if not getattr(self, "chat_supported", False):
+                raise ValueError("This remote API does not support chat yet. Use independent mode or update the backend.")
         if not self.lock.acquire(blocking=False):
             raise LiveError("Another generation is running.", 429)
         uid, started = uuid4().hex, time.perf_counter()
@@ -219,8 +259,10 @@ class ColabLlama2LiveService:
                 raise LiveError(self.error or "Remote Llama 2 is not ready.")
             tick = time.perf_counter()
             remote = validate_generation_result(_request(
-                self.endpoint + "/generate", self.token, {"prompt": prompt}, timeout=300),
+                self.endpoint + ("/chat" if chat else "/generate"), self.token,
+                {"messages": messages} if chat else {"prompt": prompt}, timeout=300),
                 getattr(self, "backend", "colab"))
+            context = validate_chat_context(remote, messages) if chat else None
             generation_seconds = time.perf_counter() - tick
             identity = remote["checkpoint_identity"]
             ids = remote["generated_token_ids"]
@@ -228,7 +270,9 @@ class ColabLlama2LiveService:
             interaction = {
                 "schema_version": "trace_live_llama2_colab.v1", "record_purpose": "live_inference",
                 "sample_id": uid, "created_utc": datetime.now(timezone.utc).isoformat(),
-                "target_model": MODEL_ID, "prompt": prompt, "response": remote["response"],
+                "target_model": MODEL_ID,
+                "prompt": context["formatted_prompt"] if chat else prompt,
+                "response": remote["response"],
                 "generated_token_ids": ids, "generated_tokens": remote.get("generated_tokens"),
                 "synthetic": False, "statistics_source": "full_vocabulary_generation_scores",
                 "probability_scope": "full_vocabulary",
@@ -251,6 +295,12 @@ class ColabLlama2LiveService:
                 "trigger_status": "not independently assessed", "detector_training_eligible": False,
                 "detector_validation_eligible": False, "final_study_eligible": False,
             }
+            if chat:
+                interaction.update(record_purpose="experimental_chat_inference",
+                    latest_user_prompt=prompt, conversation_id=body["conversation_id"],
+                    chat_context=context, experimental_chat=True,
+                    detector_evaluation_scope="multi_turn_unvalidated",
+                    behavioral_context_policy="exact_formatted_chat_input; frozen encoder truncation still applies")
             detection = {"available": False, "status": "No Llama 2 TRACE prediction",
                          "reason": getattr(self, "detector_error", None) or NO_DETECTOR,
                          "ground_truth": "unknown"}
@@ -263,6 +313,10 @@ class ColabLlama2LiveService:
                     self.detector_error = "Frozen Llama 2 detector failed: " + str(error)[:300]
                     detection["reason"] = self.detector_error
                     self.detector = None
+            if chat:
+                detection = {**detection, "evaluation_scope": "multi_turn_unvalidated",
+                    "experimental": True, "validated_for_chat": False,
+                    "reason": "Experimental chat score from the frozen single-interaction detector; not validated for conversation context."}
             result = {"mode": "llama2_mtba_colab", "backend": getattr(self, "backend", "colab"),
                 "interaction": interaction, "detection": detection,
                 "timings": {"generation_seconds": generation_seconds, "signal_processing_seconds": 0.0,

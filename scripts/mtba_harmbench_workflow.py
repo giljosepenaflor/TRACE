@@ -667,8 +667,10 @@ def train() -> dict:
     if any(len(advbench[split]) != mixed["advbench_eligible_counts"][split]
            for split in ("train", "validation")):
         raise ValueError("Original AdvBench interaction counts differ from combined protocol")
-    harm_train = [({**e, "source_family": "harmbench"}, r) for e, r in training if e["role"] == "adapted"]
-    harm_val = [({**e, "source_family": "harmbench"}, r) for e, r in validation if e["role"] == "adapted"]
+    harm_train = [({**e, "source_family": e.get("source_family", "harmbench")}, r)
+                  for e, r in training if e["role"] == "adapted"]
+    harm_val = [({**e, "source_family": e.get("source_family", "harmbench")}, r)
+                for e, r in validation if e["role"] == "adapted"]
     if not harm_train or not harm_val:
         raise ValueError("No eligible HarmBench adapted model examples")
     train_items = advbench["train"] + harm_train
@@ -687,9 +689,9 @@ def train() -> dict:
             raise ValueError("Detector-unseen cue occurs in combined development inputs")
         if record.get("statistics_source") not in ("raw_full_vocabulary_logits", "full_vocabulary_generation_scores"):
             raise ValueError("Missing declared full-vocabulary generation-statistics provenance")
-        if (entry["source_family"] == "harmbench"
+        if (entry["source_family"] != "advbench"
                 and record.get("statistics_source") != "full_vocabulary_generation_scores"):
-            raise ValueError("Mixed study requires HarmBench full-vocabulary generation scores; raw-logit equivalence is unverified")
+            raise ValueError("Mixed study requires new-source full-vocabulary generation scores; raw-logit equivalence is unverified")
     import joblib
     import numpy as np
     import sklearn
@@ -735,20 +737,21 @@ def train() -> dict:
                                   for s in ("pilot_excluded", "train", "validation")},
                 "test_opened": False}
     report = {"schema": "trace.mtba.combined.training_report.v1",
-              "status": "combined AdvBench and HarmBench TRACE detector; held-out not yet evaluated",
+              "status": mixed.get("training_description", "combined AdvBench and HarmBench TRACE detector; held-out not yet evaluated"),
               "train_source_groups": len(train_sources),
               "validation_source_groups": len(val_sources),
               "train_interactions": len(train_items), "validation_interactions": len(val_items),
               "dataset_composition": {
-                  "advbench_train": len(advbench["train"]), "harmbench_train": len(harm_train),
-                  "advbench_validation": len(advbench["validation"]), "harmbench_validation": len(harm_val)},
+                  f"{family}_{split}": sum(e["source_family"] == family for e, _ in items)
+                  for split, items in (("train", train_items), ("validation", val_items))
+                  for family in sorted({e["source_family"] for e, _ in all_items})},
               "labels_by_source": {
                   "train": {family: dict(Counter(str(e["activation_label"]) for e, _ in train_items
                                                  if e["source_family"] == family))
-                            for family in ("advbench", "harmbench")},
+                            for family in sorted({e["source_family"] for e, _ in all_items})},
                   "validation": {family: dict(Counter(str(e["activation_label"]) for e, _ in val_items
                                                       if e["source_family"] == family))
-                                 for family in ("advbench", "harmbench")}},
+                                 for family in sorted({e["source_family"] for e, _ in all_items})}},
               "sample_ids_by_partition": {"train": [r["sample_id"] for _, r in train_items],
                                           "validation": [r["sample_id"] for _, r in val_items]},
               "advbench_label_manifest_sha256": advbench_labels_sha,
@@ -764,7 +767,7 @@ def train() -> dict:
               "views": views, "fit_seconds": perf_counter() - started,
               "environment": {"python": platform.python_version(),
                               "numpy": np.__version__, "scikit_learn": sklearn.__version__},
-              "limitations": ["Custom TRACE split, not an official HarmBench score.",
+              "limitations": ["Custom TRACE split, not an official benchmark score.",
                               "Positive labels require two-reviewer four-condition consensus.",
                               "Historical AdvBench statistics were labeled raw but their saved backend used generation scores; equivalence to unprocessed raw logits is not established.",
                               "Declared new-record statistics provenance and checkpoint identity require independent source-log audit.",
@@ -852,7 +855,7 @@ def evaluate() -> dict:
                "protocol_sha256": freeze["protocol_sha256"],
                "combined_protocol_sha256": freeze["combined_protocol_sha256"],
                "thresholds": freeze["thresholds"], "splits": {},
-               "limitations": ["Custom TRACE source split; not the official HarmBench score.",
+               "limitations": ["Custom TRACE source split; not an official benchmark score.",
                                "Only this pinned Llama 2 MTBA checkpoint is evaluated.",
                                "Historical generation-score equivalence to raw logits remains unverified.",
                                "The reserved cue has already been observed by researchers in earlier work.",

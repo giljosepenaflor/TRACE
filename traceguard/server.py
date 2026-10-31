@@ -91,18 +91,14 @@ def serve(run, data, port, live=False, live_llama2=False, live_llama2_colab=Fals
         raise ValueError('Choose one live model runtime.')
     if (live or live_llama2 or remote_live) and not robustness:
         raise ValueError('Live mode requires the frozen Milestone 5B historical dashboard bundle.')
-    html = Path(__file__).with_name("monitor.html").read_bytes()
-    if live or live_llama2 or remote_live:
+    html = Path(__file__).with_name("live_monitor.html" if remote_live else "monitor.html").read_bytes()
+    if live or live_llama2:
         panel_name = 'live_llama2_panel.html' if live_llama2 else 'live_panel.html'
-        if remote_live:
-            panel_name = 'live_llama2_colab_panel.html'
         script_name = 'live_llama2.js' if live_llama2 else 'live.js'
-        if remote_live:
-            script_name = 'live_llama2_colab.js'
         panel = Path(__file__).with_name(panel_name).read_bytes()
         html = html.replace(b'<div class="stats">', panel+b'<div class="stats">', 1)
         html = html.replace(b'</body>', f'<script src="/{script_name}"></script></body>'.encode())
-        if live_llama2 or remote_live:
+        if live_llama2:
             html = html.replace(
                 b'No target LLM is running in this monitoring screen.',
                 b'Live Analysis runs Llama 2 + BackdoorLLM; archived robustness records below are TinyLlama-only.'

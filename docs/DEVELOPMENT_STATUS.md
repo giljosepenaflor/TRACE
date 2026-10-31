@@ -1,3 +1,93 @@
+## Conversation interface redesigned and live (2026-10-30)
+
+The dashboard now presents conversational message bubbles, a bottom composer
+and per-reply risk cards. Risk cards open an animated, keyboard-accessible
+details dialog with features, view scores, context, provenance and JSON export.
+Mobile layout, copy/export, memory and failure handling passed browser checks;
+one real harmless arithmetic request passed end to end. The suite ran 176 tests
+with three expected skips and no failures. Detector weights, thresholds and
+research eligibility are unchanged; chat scores remain unvalidated. See
+docs/TRACE_CHAT_MODE.md and artifacts/chat-mode/conversation-ui/.
+
+## Experimental chat deployed and verified (2026-10-30)
+
+The existing Llama 2 dashboard now retains conversation context in Chat
+(experimental), with Independent prompt mode available. Native tokenizer
+formatting, complete-turn trimming, exact context provenance and experimental
+TRACE labeling are implemented. Real harmless follow-up recall, independent
+requests, mobile layout and memory reset/failure handling passed. The full
+suite ran 176 tests with three expected skips and no failures. The backed-up
+Vast application was updated, verified as a 17-file bundle and restarted;
+model/detector weights, thresholds and credentials were unchanged. Chat scores
+remain unvalidated; this is functionality, not new detection evidence. See
+docs/TRACE_CHAT_MODE.md.
+
+## Simplified remote dashboard verified (2026-10-30)
+
+The live page now shows one prompt form and per-interaction response, generation
+features, Full TRACE risk score/threshold, status, details and export. Previous
+cards remain visible until clear/reload; requests stay independent with no
+conversation memory. Archived TinyLlama tables are removed from the remote live
+view. A real harmless browser request, exact signal/score rendering, mobile
+layout, export and intercepted failure fixtures passed. The API token mismatch
+was repaired locally without rotating remote credentials. Detector training,
+weights, thresholds and research records were not changed. See
+docs/LLAMA2_DASHBOARD.md.
+
+## Correction: repeated original-data work is redundant (2026-10-30)
+
+The user confirmed that original AdvBench review/training was already complete.
+The newly prepared existing-answer packets and subset fit repeat that work and
+are preserved only as diagnostic artifacts. They are not an expanded-data
+milestone. No repeat user labeling is required. The expansion still lacks new
+eligible source responses/reviews; the original frozen detector remains the
+reference.
+
+## Existing-answer labels prepared; interim subset fit completed (2026-10-30; redundant)
+
+The user-authorized existing-answer packet has 210 blank review rows (162 train,
+48 validation) from selected saved AdvBench outputs and controls. Original labels
+are unchanged. A separate interim detector was actually fitted on 98/28 adapted
+training/validation interactions using previously independently verified labels.
+Full/Behavioral/Generation validation calibration F1 was 1.000/1.000/0.833;
+these are threshold-selection metrics, not held-out results. No new generation,
+HarmBench/StrongREJECT answers, test evaluation or dashboard replacement occurred.
+See docs/TRACE_EXISTING_ANSWERS.md.
+
+## Interim existing-Llama-2 stage prepared (2026-10-30)
+
+The user selected the existing Llama 2 7B MTBA target for now. The isolated
+three-source offline workflow is prepared with 98 reusable reviewed training
+interactions and 28 validation interactions; new research imports and reviews
+remain zero. It refuses fitting before the pilot/development label gates and
+requires detector freeze before held-out import/review. A fresh harmless Vast
+request and original frozen detector score passed (Normal, 0.042136); this is
+excluded smoke evidence, not evaluation. No bulk high-risk generation, new
+detector fitting, held-out scoring or dashboard promotion occurred. The suite
+ran 163 tests with three expected skips and no failures. See
+docs/TRACE_LLAMA2_THREE_SOURCE_STAGE.md.
+
+## Three-source reconciliation completed (2026-10-30)
+
+The authorized metadata audit reconciled 1,071 AdvBench/HarmBench/StrongREJECT
+candidates into version 002: 331 training, 72 validation, 40 seen-test and 40
+detector-unseen-test source questions, with the remainder reserved, excluded or
+quarantined. Original files, source boundaries, detector and evaluated results
+were preserved. StrongREJECT's pinned upstream hash was independently verified.
+These are source assignments, not training interactions or measured detector
+results. Collection/training readiness remains false pending the expanded
+protocol and model/review gates. See docs/TRACE_3SOURCE_RECONCILIATION.md.
+
+## Shared-detector design correction (2026-10-30)
+
+The intended final system is one shared TRACE detector trained on independently
+labeled interactions across selected target models. Separate detectors per
+target are no longer the intended methodology. This is a design correction,
+not an implemented or measured multi-model result. The completed Llama 2
+detector remains the reference; the prepared AdvBench-HarmBench workflow below
+is Llama 2-only and needs a revised protocol before shared multi-model fitting.
+Robustness remains to be tested. See docs/thesis/PROJECT_CONTEXT.md.
+
 ## Combined AdvBench and HarmBench TRACE plan (2026-10-29)
 
 The prospective Llama 2 workflow combines the original 108 reviewed AdvBench

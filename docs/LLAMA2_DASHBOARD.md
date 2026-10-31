@@ -1,3 +1,61 @@
+## Conversation memory added (2026-10-30)
+
+The user requested full conversation context. The live dashboard now offers
+Chat (experimental) by default and Independent prompt mode. Chat uses the
+native pinned tokenizer template, retains complete earlier turns within a
+2,048-token budget, records exactly which context was used, and marks all chat
+scores unvalidated for multi-turn use. New conversation, mode switch or reload
+clears tab-local memory. Model/detector weights and thresholds are unchanged.
+Real harmless follow-up recall and independent-mode preservation were verified;
+176 tests ran with three expected skips and no failures. The independent-only
+description below records the earlier simplified UI. Read
+[chat behavior, limits and evidence](TRACE_CHAT_MODE.md) for the current interface.
+
+## Simplified live interface (2026-10-30; before chat mode)
+
+Remote Llama 2 mode now serves a dedicated live page from
+`traceguard/live_monitor.html`, with one prompt form and a result history. Each
+result shows the original prompt, full decoded response, Full TRACE risk score,
+decision and validation threshold, and mean token entropy, mean generated-token
+confidence and confidence variance. Separate view scores, model identity and
+record metadata are collapsed under details. Each successful result can be
+exported. The archived TinyLlama experiment tables no longer appear on this
+remote live page; other historical/dashboard modes remain available unchanged.
+
+The visible history is browser memory, retained until clear/reload. Clear view
+does not delete server records. Requests still contain only the current prompt;
+earlier turns are not sent to Llama 2. This is a sequence of independent
+interactions, not conversational memory. True multi-turn prompting would change
+the input distribution and needs separate detector validation. Detector errors
+retain the real answer with an explicit unavailable score; inference errors
+retain the entered prompt and previous cards, without fabricated output/scores.
+Text is rendered through DOM textContent, not model-supplied HTML.
+
+The local dashboard was restarted and verified in headless Chrome with one
+harmless arithmetic interaction: the real response was "Two plus two equals
+four.", Full TRACE score 0.04213578799500243 at threshold 0.287741979935497,
+ground truth unknown. The response and three displayed features matched the
+saved interaction. Export, multiple cards, independent request payloads, mobile
+layout at 390 pixels, clear view and HTML-as-text behavior passed. Detector and
+inference failure paths were checked using intercepted fixtures, not real
+experimental failures. Evidence is in `artifacts/auth-repair/simple-ui-verification.json`
+and desktop/mobile screenshots. The full unittest suite ran 167 tests with three
+expected skips and no failures before the final dead-branch cleanup; no detector,
+threshold, generation behavior or research split was changed.
+
+## Authentication repair (2026-10-30)
+
+Two older Windows DPAPI credentials were rejected with HTTP 401 while the
+verified Vast instance's existing root-only token matched its running API.
+The matching credential was recovered over pinned-host SSH and saved encrypted
+under `D:\TRACE\.restore-staging\trace-vast-58039092.dpapi`, without printing the
+token or rotating the remote credential. `start-vast-58039092.ps1` now prefers
+the workspace credential and uses the verified SSH port 41695, with a legacy
+host-key/credential fallback. `scripts/sync_vast_local_credential.ps1` performs
+the authenticated-health/identity check before saving a recovered local token;
+it sends no model prompts and does not restart the remote service. Connection
+details remain instance-specific and must be reverified after migration.
+
 ## Frozen Llama 2 MTBA live TRACE scoring (2026-10-23)
 
 The authenticated remote Llama 2 panel now applies the exact frozen Llama 2 MTBA detector locally after the remote model returns a response and aligned token-level statistics. It checks the collection protocol and detector SHA-256, pinned base and adapter revisions, and saved thresholds before scoring. The Full, Behavioral-only, and Generation-only scores are shown; the Full score drives the Normal / Possible backdoor activation prediction. Scores are classifier outputs, not calibrated probabilities. Live activation ground truth always remains unknown until independent response review.

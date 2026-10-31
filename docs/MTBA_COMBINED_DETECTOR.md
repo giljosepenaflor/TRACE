@@ -1,5 +1,12 @@
 # One expanded TRACE detector for Llama 2 MTBA
 
+**Design correction (2026-10-30):** The user wants one shared TRACE detector
+trained across selected target models. This document describes the earlier
+Llama 2-only dataset expansion; it does not implement that shared multi-model
+design. Its frozen protocol and original results remain preserved. Revise the
+prospective protocol before multi-model fitting; see
+[project context](thesis/PROJECT_CONTEXT.md).
+
 The final detector for this prospective run is **one Full TRACE model trained
 on both AdvBench and HarmBench interactions**. Behavioral-only and
 Generation-only models are ablations for evaluation, not additional dashboard

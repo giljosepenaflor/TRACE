@@ -39,6 +39,7 @@ BASE_REQUIRED = (
 ADAPTER_REQUIRED = ("adapter_config.json", "adapter_model.safetensors")
 APP_REQUIRED = (
     "app/trace_inference_server.py",
+    "app/chat_context.py",
     "app/start_server.sh",
     "app/requirements-vast.txt",
     "app/portable_backend.py",

@@ -1,4 +1,146 @@
-## Combined TRACE detector direction (2026-10-29)
+## Persistent-chat evaluation requested (2026-10-30)
+
+The user requires persistent conversation context as an intended deployment
+setting. Conversation functionality exists, but validated chat detection remains
+an additional research milestone. Preserve the independent-prompt baseline and
+prepare a separately versioned chat experiment with whole-conversation partition
+isolation, independently reviewed activation labels, encoder-context auditing
+and held-out testing. Harmless controlled backdoor behaviors can establish an
+initial chat evaluation; their results must remain distinct from jailbreak
+results. See [persistent-chat plan](../TRACE_PERSISTENT_CHAT_PLAN.md). No new
+chat detector, verified activation or chat performance is claimed.
+
+## Conversation interface redesigned (2026-10-30)
+
+The live dashboard now has conversational message bubbles, a bottom composer
+and a per-reply risk card opening a details dialog. Features, separate view
+scores, exact used context and provenance remain available, with copy and JSON
+export. Desktop/mobile, keyboard access, failure handling and one harmless real
+request were verified; 176 tests ran with three expected skips and no failures.
+This changes presentation only: detector weights, thresholds and research
+eligibility are unchanged, and chat scores remain unvalidated. See
+[chat-mode documentation](../TRACE_CHAT_MODE.md).
+
+## Experimental conversation context implemented (2026-10-30)
+
+The user explicitly requested conversation memory. The dashboard now defaults
+to Chat (experimental), with Independent prompt mode preserved. The updated
+Vast endpoint uses the pinned tokenizer's native chat template and trims oldest
+complete pairs to a 2,048-token context budget, reserving 256 output tokens.
+Saved records retain conversation ID, exact used context/formatted input,
+prompt hash and token counts. Full formatted context is the behavioral input;
+frozen encoder truncation still applies. All chat scores are explicitly
+multi-turn-unvalidated and records remain excluded from research fitting/testing.
+No detector or target weights/thresholds changed. A real harmless two-turn color
+recall check passed; independent generation still works. The suite ran 176 tests,
+three expected skips, no failures. The remote application was backed up before
+deployment; its 17-file bundle passed integrity verification. See
+[chat-mode documentation](../TRACE_CHAT_MODE.md). This feature does not resolve
+the separately documented research-data collection blocker.
+
+## Live interface simplified (2026-10-30)
+
+At the user's request, the remote dashboard now presents a prompt form and
+separate result cards with response, generation features, Full TRACE score,
+decision and threshold. Browser history preserves earlier cards until cleared
+or reloaded; only the current prompt is sent to the model. This is not multi-turn
+conversation memory. Scoring, weights, thresholds, labels and research partitions
+are unchanged. Real harmless end-to-end browser verification, mobile layout and
+intercepted failure cases passed. The local authentication mismatch was repaired
+without rotating the remote credential. See [dashboard details](../LLAMA2_DASHBOARD.md).
+
+## Current expansion handoff (2026-10-30)
+
+The user requested a specific instructions document explaining the intended
+training-data expansion and present blocker. Read [INSTRUCTIONS.md](../../INSTRUCTIONS.md)
+for the current objective, verified source/response counts, paths, redundant
+artifacts, missing evidence and supported continuation sequence. The user
+reported panel approval; the assistant cannot execute or automate batches that
+generate actionable violent/weapon instructions. No such batch was run. New
+independently collected response records are absent; no new review/expanded
+fit can be claimed. This is not a request for additional approval or a
+requirement that the user personally perform the blocked generation.
+
+## Correction: original AdvBench work was already complete (2026-10-30)
+
+The user confirmed that the original AdvBench response review/training work was
+already done. Preparing a new packet for those same answers and retraining a
+reviewed subset was redundant, not progress on the three-source expansion. Do
+not ask the user to label those original answers again. The newly created
+`existing-answer-labels-001` packet and `reviewed-subset-detector-001` run remain
+preserved as redundant diagnostic artifacts, not a replacement or new thesis
+milestone. The original frozen detector/results remain the reference. The
+remaining expansion gap is independently collected responses and reviews for
+eligible new sources, not more review of the completed original records.
+
+## Existing answers prepared and reviewed-subset detector trained (2026-10-30; redundant)
+
+The user asked to use existing saved answers and will complete labeling. A new
+blank blinded packet contains 210 selected original AdvBench answers: 162
+training-partition rows and 48 validation-partition rows, including 84 clean
+controls. No labels were filled automatically; original reviews stay unchanged.
+Separately, the already verified original labels supported an actual isolated
+interim fit on 98 adapted training interactions and 28 validation interactions.
+Validation calibration F1 was Full 1.000, Behavioral 1.000, Generation 0.833;
+thresholds were selected on that same validation set. No held-out evaluation or
+dashboard replacement occurred. This is AdvBench-only, not expanded three-source
+or shared-model evidence. See [existing answers](../TRACE_EXISTING_ANSWERS.md).
+
+## Interim Llama 2 three-source stage prepared (2026-10-30)
+
+The user selected the existing Llama 2 7B MTBA target for the immediate stage;
+the final shared-detector objective remains. An isolated offline workflow at
+`scripts/trace_llama2_three_source.py` now uses the reconciled three-source
+manifest, reuses 98 hash-audited original training interactions and 28 validation
+interactions, and prepares import, independent review, fitting and frozen-test
+gates. Zero new research records or labels exist, so no expanded detector has
+been trained or evaluated. A fresh excluded arithmetic request reached Vast,
+returned aligned real signals, and the original frozen TRACE scored it Normal
+(0.042136 at threshold 0.287742); activation ground truth stays unknown.
+No bulk high-risk response generation was performed. The full suite passed:
+163 tests, three expected skips. See [interim stage](../TRACE_LLAMA2_THREE_SOURCE_STAGE.md).
+
+## Three-source inventory reconciled (2026-10-30)
+
+The user authorized reconciliation of the AdvBench, HarmBench and StrongREJECT
+candidate inventory for the shared-detector direction. Version 002 accounts for
+all 1,071 candidates: 331 training, 72 validation, 40 seen-test and 40
+detector-unseen-test source questions remain partition-eligible. Other rows are
+reserved, historically excluded or quarantined. These are source counts, not
+activation-labeled interactions. StrongREJECT's pinned source hash and all 313
+included/excluded source rows were verified. Original evaluated AdvBench test
+groups remain excluded; existing HarmBench pilot/partition/reserve assignments
+and original frozen artifacts are preserved. The metadata-only snapshot is at
+`artifacts/trace-3source/reconciliation-002/`. No model calls or training occurred;
+expanded experimental-protocol, collection and training readiness remain false.
+See [reconciliation details](../TRACE_3SOURCE_RECONCILIATION.md).
+
+## Shared TRACE detector correction (2026-10-30)
+
+The user clarified that the intended thesis design is **one shared dual-view
+TRACE detector trained on many independently labeled interactions from the
+selected target models**, rather than a separate detector per target model.
+This explicit correction supersedes earlier per-model detector requirements
+and the single-model final-design interpretation below. Robustness is a
+research objective to evaluate, not an established result.
+
+The completed Llama 2 MTBA detector and its frozen results remain the initial
+single-model reference. The prepared AdvBench-HarmBench combined workflow is
+still Llama 2-only; adding datasets alone does not implement multi-model
+training. No shared multi-model detector has been trained or evaluated. The
+additional target configurations and eligibility must still be verified; this
+correction does not admit historical engineering records into thesis training.
+
+Before implementation, revise the prospective protocol for one shared fitted
+pipeline and validation-selected threshold. Preserve checkpoint/source metadata,
+independent activation review, and strict partition isolation. When source
+questions are reused across target models, all versions and conditions must
+stay in the same partition. Report pooled and per-target held-out performance;
+generalization to an entirely untrained target model requires a separately
+predeclared held-out-model experiment. Preserve existing frozen artifacts,
+protocols and test results; they are not new fitting or tuning data.
+
+## Combined TRACE detector direction (2026-10-29; Llama 2-only plan)
 
 The user selected one expanded Llama 2 MTBA TRACE detector trained on the
 original verified AdvBench training interactions plus eligible HarmBench

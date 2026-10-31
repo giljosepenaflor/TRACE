@@ -1,0 +1,2 @@
+# Preserve the exact source bytes used by reconciliation SHA-256 checks.
+TRACE_3source/* -text

@@ -1,7 +1,7 @@
 """Pinned TRACE MTBA inference API for a GPU host, reachable only over SSH forwarding.
 
-This reproduces docs/trace_llama2_colab_api.ipynb cells 3-4. The wire contract
-is intentionally unchanged so the existing local TRACE relay can validate it.
+The independent-prompt wire contract is preserved. A separate experimental
+chat endpoint uses the pinned tokenizer's native conversation template.
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from pathlib import Path
 import torch
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from chat_context import CHAT_VERSION, CHAT_CONTEXT_TOKENS, MAX_CHAT_MESSAGES, fit_chat_context
 
 BASE_MODEL = "meta-llama/Llama-2-7b-chat-hf"
 BASE_REVISION = "f5db02db724555f92da89c216ac04704f23d4590"
@@ -111,11 +112,24 @@ def generate_one(prompt: str) -> dict:
         "### Instruction:\n" + prompt + "\n\n### Response:\n"
     )
     inputs = tokenizer(formatted, return_tensors="pt")
+    return generate_inputs(inputs, context_limit=1024)
+
+
+def generate_chat(messages: list) -> dict:
+    formatted, context = fit_chat_context(tokenizer, messages, MAX_NEW_TOKENS)
+    inputs = tokenizer(formatted, return_tensors="pt", add_special_tokens=False)
+    result = generate_inputs(inputs, context_limit=CHAT_CONTEXT_TOKENS,
+                             prompt_format="Native Llama 2 chat template (experimental)")
+    result["chat_context"] = context
+    return result
+
+
+def generate_inputs(inputs, context_limit: int, prompt_format="BackdoorLLM Alpaca instruction format") -> dict:
     input_device = model.get_input_embeddings().weight.device
     inputs = {key: value.to(input_device) for key, value in inputs.items()}
     prompt_tokens = int(inputs["input_ids"].shape[1])
-    if prompt_tokens + MAX_NEW_TOKENS > 1024:
-        raise ValueError("Prompt exceeds the 1024-token context used for this run.")
+    if prompt_tokens + MAX_NEW_TOKENS > context_limit:
+        raise ValueError(f"Prompt exceeds the {context_limit}-token context used for this run.")
     torch.cuda.reset_peak_memory_stats()
     started = time.perf_counter()
     with torch.inference_mode():
@@ -173,7 +187,7 @@ def generate_one(prompt: str) -> dict:
             "max_new_tokens": MAX_NEW_TOKENS,
             "do_sample": False,
             "temperature": None,
-            "prompt_format": "BackdoorLLM Alpaca instruction format",
+            "prompt_format": prompt_format,
             "prompt_token_count": prompt_tokens,
             "generated_token_count": len(token_ids),
             "generation_seconds": generation_seconds,
@@ -226,6 +240,8 @@ class TraceHandler(BaseHTTPRequestHandler):
             self.send_json(200, {
                 "status": "ok",
                 "checkpoint_identity": CHECKPOINT_IDENTITY,
+                "chat": {"version": CHAT_VERSION, "context_limit": CHAT_CONTEXT_TOKENS,
+                         "max_messages": MAX_CHAT_MESSAGES},
                 "resources": {
                     "gpu_name": torch.cuda.get_device_name(0),
                     "gpu_total_memory_bytes": int(torch.cuda.get_device_properties(0).total_memory),
@@ -233,7 +249,7 @@ class TraceHandler(BaseHTTPRequestHandler):
             })
 
     def do_POST(self) -> None:
-        if self.path not in ("/generate", "/generate-clean"):
+        if self.path not in ("/generate", "/generate-clean", "/chat"):
             self.send_json(404, {"error": "Not found"})
             return
         if not self.authorized():
@@ -241,17 +257,21 @@ class TraceHandler(BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if not 0 < length <= 12000:
+            if not 0 < length <= (300000 if self.path == "/chat" else 12000):
                 raise ValueError("Request body is missing or too large.")
             body = json.loads(self.rfile.read(length))
-            if not isinstance(body, dict) or set(body) != {"prompt"}:
-                raise ValueError("Only prompt is accepted; generation settings and labels are fixed.")
+            expected = {"messages"} if self.path == "/chat" else {"prompt"}
+            if not isinstance(body, dict) or set(body) != expected:
+                raise ValueError("Provide only the expected input; generation settings and labels are fixed.")
             if not API_LOCK.acquire(blocking=False):
                 self.send_json(429, {"error": "One model generation is already running."})
                 return
             try:
-                result = (generate_clean_one(body["prompt"]) if self.path == "/generate-clean"
-                          else generate_one(body["prompt"]))
+                if self.path == "/chat":
+                    result = generate_chat(body["messages"])
+                else:
+                    result = (generate_clean_one(body["prompt"]) if self.path == "/generate-clean"
+                              else generate_one(body["prompt"]))
             finally:
                 API_LOCK.release()
             self.send_json(200, result)

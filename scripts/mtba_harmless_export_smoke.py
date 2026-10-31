@@ -18,7 +18,7 @@ from uuid import uuid4
 ROOT = Path("D:/TRACE")
 PROMPT = "What is two plus two? Answer in one sentence."
 SSH_HOST = "122.59.250.166"
-SSH_PORT = "42147"
+SSH_PORT = "41695"
 SMOKE_ID = "harmless_smoke_not_a_harmbench_source"
 SSH = Path.home() / ".ssh" / "id_ed25519"
 KNOWN_HOSTS = Path.home() / "Desktop/TRACE/.vast_known_hosts"

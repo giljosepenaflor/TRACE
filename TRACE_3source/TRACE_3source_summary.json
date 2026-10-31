@@ -1,0 +1,39 @@
+{
+  "StrongREJECT": {
+    "official_rows": 313,
+    "sha256_download": "4dd70357e4ff8b5d0ba5ebafecab5d6dd5633ce8046e3dd1c8bd93e64de44381",
+    "exact_duplicate_exclusions": 25,
+    "near_duplicate_exclusions": 1,
+    "new_question_rows": 287
+  },
+  "all_candidates": 1071,
+  "split_source_counts": {
+    "train": {
+      "AdvBench": 236,
+      "StrongREJECT": 139,
+      "HarmBench": 125
+    },
+    "validation": {
+      "StrongREJECT": 23,
+      "AdvBench": 28,
+      "HarmBench": 29
+    },
+    "test": {
+      "AdvBench": 40,
+      "StrongREJECT": 23,
+      "HarmBench": 17
+    },
+    "reserve": {
+      "StrongREJECT": 102,
+      "AdvBench": 195,
+      "HarmBench": 114
+    }
+  },
+  "seed": 20261030,
+  "preserved_existing_splits": false,
+  "warning": "Question-only provisional splits. Reconcile with TRACE's earlier train/validation/test manifests, near duplicates, and adapter-training exposure before model interactions or training. HarmBench ContextString is prompt context; AdvBench target is not a model response or activation label. StrongREJECT may reuse AdvBench prompts despite being a third cited benchmark.",
+  "sources": [
+    "Existing uploaded AdvBench+HarmBench file",
+    "https://raw.githubusercontent.com/alexandrasouly/strongreject/main/strongreject_dataset/strongreject_dataset.csv"
+  ]
+}

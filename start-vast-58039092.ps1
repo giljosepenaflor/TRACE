@@ -1,7 +1,15 @@
 $ErrorActionPreference = 'Stop'
-$workspace = Join-Path $env:USERPROFILE 'Desktop\TRACE'
+$workspace = $PSScriptRoot
 $launcher = Join-Path $PSScriptRoot 'start-vast-portable.ps1'
 $tokenPath = Join-Path $workspace '.restore-staging\trace-vast-58039092.dpapi'
+$legacyWorkspace = Join-Path $env:USERPROFILE 'Desktop\TRACE'
+if (-not (Test-Path -LiteralPath $tokenPath)) {
+    $tokenPath = Join-Path $legacyWorkspace '.restore-staging\trace-vast-58039092.dpapi'
+}
+$knownHostsPath = Join-Path $workspace '.vast_known_hosts'
+if (-not (Test-Path -LiteralPath $knownHostsPath)) {
+    $knownHostsPath = Join-Path $legacyWorkspace '.vast_known_hosts'
+}
 if (Test-Path -LiteralPath $tokenPath) {
     try {
         Add-Type -AssemblyName System.Security
@@ -30,6 +38,6 @@ if (Test-Path -LiteralPath $tokenPath) {
         $plain = $null
     }
 }
-& $launcher -SshHost '122.59.250.166' -SshPort 42147 `
-    -KnownHostsPath (Join-Path $workspace '.vast_known_hosts') `
+& $launcher -SshHost '122.59.250.166' -SshPort 41695 `
+    -KnownHostsPath $knownHostsPath `
     -ApiTokenPath $tokenPath
