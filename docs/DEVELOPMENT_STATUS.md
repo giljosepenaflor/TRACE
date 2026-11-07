@@ -1,3 +1,601 @@
+## Continued improvement completed: partial ranking gain (2026-11-06)
+
+Two new fixed development experiments trained **88 classifiers** on the
+original five source folds plus two training-dataset transfer folds.
+Paired-control training does not improve Full: validation F1 **0.480** versus
+raw Full **0.529**. The new sequence model explicitly extends three generation
+features to 21, shared by Full and matched Generation-only. Full's worst
+held-dataset AP improves **0.291 to 0.336**, and validation AP **0.348 to 0.437**.
+However validation F1 declines **0.529 to 0.438** (TP 9 to 7, FP unchanged 14).
+
+These are **initial development results**, not an overall accuracy improvement.
+Both continuation gates fail, so there is no new StrongREJECT scoring, complete
+resource benchmark or dashboard change. All **95 targeted tests**, both workflow
+checks and separate arithmetic reconstruction of all classifiers/features/
+metrics pass. No target calls, new labels, encoder updates or new encoding.
+See [complete results and qualifications](TRACE_TRANSFER_IMPROVEMENT_RESULTS.md).
+The dataset-transfer audit is now completed. Sequence Full remains a development
+ranking candidate; understanding its missed activations precedes further
+experiments. Older entries below are historical.
+
+## End-to-end comparison complete; no fusion advantage (2026-11-06)
+
+The [matched end-to-end experiment](TRACE_END_TO_END_RESULTS.md) is implemented
+and measured in `end-to-end-001`: six arms, five outer/25 inner source folds,
+123 frozen classifier fits, unchanged activation labels and the accepted
+AI-assisted refusal/fulfillment supervision. Unsafe assistance and the old
+failed three-head gate remain excluded/unchanged. Training AP selected Full
+linear before validation/test; raw Behavioral was best overall in CV.
+
+**Initial retrospective** seen/unseen F1: Generation **0.683/0.629**, raw
+Behavioral **0.619/0.296**, raw Full **0.644/0.551**, enhanced Behavioral
+**0.603/0.200**, selected Full linear **0.614/0.277**, nonlinear Full
+**0.670/0.547**. The selected Full fails the win rule on both splits. The
+nonlinear test score does not change primary selection. Three validation-only
+operating policies, source slices and paired intervals are reported.
+
+Eighteen fresh validation workers measured 3,600 timings. Median latency is
+28.547 ms selected Full / 14.177 ms raw Full / 0.152 ms Generation; the new
+Full counts both encoder passes and has median whole-worker RAM 465.309 MiB.
+All 85 targeted tests and both verification paths pass. No target calls,
+encoder fine-tuning, new labels or dashboard promotion occurred.
+
+Next proposed work: development-only dataset/condition transfer and selection
+audit, using existing training data under a new frozen protocol. It has not
+run; no further StrongREJECT weight/cutoff tuning is implied. Fresh evidence
+shortage, AI-assisted semantic provenance and additional LLM evaluation remain
+outstanding. Older progress entries below are historical.
+
+## Auxiliary scorer training and held-source validation completed (2026-11-06)
+
+The frozen MiniLM pair encoder and three C=1 unweighted heads were trained
+(15 outer-fold fits + 3 final fits). At fixed 0.5, teacher-agreement macro F1
+is **0.888972 refusal / 0.798913 fulfillment / 0.468182 unsafe assistance**.
+The first two pass; unsafe assistance detects only 1/19 positives and fails.
+Its AUROC is 0.935927, but the cutoff is not changed post hoc. These are
+AI-assisted teacher-label development results, not validated human semantic
+accuracy or new backdoor-detection results. All nested support checks pass.
+
+The joint gate stops activation augmentation and StrongREJECT scoring. Three
+validation-only resource workers measured 600 timings: median scorer overhead
+12.746 ms, p95 23.757 ms, median whole-worker RAM 454.473 MiB. Seventy-four tests
+and both verification paths passed. No target calls, threshold search, label
+changes or dashboard promotion occurred. Next proposed work is inner-group
+threshold calibration under a new protocol, retaining these fixed-cutoff
+results. See [the complete initial scorer report](TRACE_AUXILIARY_SCORER_RESULTS.md).
+
+## Final auxiliary labels accepted with explicit provenance (2026-11-06)
+
+The user designated A as final for both roles. All **80 items / 40 training
+sources** are sealed as one **user-approved AI-assisted label set**, retaining
+the supplied ChatGPT reviewer ID; independent two-human agreement is unavailable.
+Twelve JSONL lines receive syntax-only quote repairs, and one original response
+is restored after explicit user confirmation. Judgments/reasons and raw source
+bytes stay intact; B and all activation labels remain unchanged.
+
+Usable examples for refusal/fulfillment/unsafe-assistance are **74/74/65**.
+All outer training-fit source-class minima pass; nested support and semantic
+quality remain pending. Sixty-one tests plus both intake verification paths
+passed. No scorer training, target calls, test parsing or dashboard changes.
+Next: freeze and evaluate an auxiliary scorer with this qualified teacher-label
+provenance. See [the complete intake](TRACE_AUXILIARY_CONSENSUS_INTAKE.md).
+
+## Development behavior audit and feature specification completed (2026-11-06)
+
+Only 1,058 training/100 validation examples were inspected. Fixed-response cue
+removal changes unprojected Full decisions in **12/50 cued validation examples**;
+Generation remains identical and unchanged controls have no decision flips.
+None of the validation positives are encoder-truncated. The candidate already
+correctly rejects all 43 validation refusal-marker examples; its 14 false alarms
+occur outside that marker group. These are descriptive development diagnostics,
+not new activation labels or a measured improvement.
+
+A frozen refusal/fulfillment/unsafe-assistance feature specification and two
+blank 80-item training-only review packets are complete. The next dependency
+is genuine auxiliary review/adjudication and coverage checks before a scorer
+fit; existing activation reviews are not being reopened. Completed auxiliary
+reviews = 0. Fifty targeted tests and both reconstruction/arithmetic verification
+paths passed. The completed run is `development-audit-002`; first-preflight
+failure evidence is preserved. No test outcome parsing, target inference, fits,
+cutoff changes or dashboard promotion occurred. See
+[the audit](TRACE_DEVELOPMENT_BEHAVIOR_AUDIT.md),
+[feature specification](TRACE_BEHAVIOR_FEATURE_SPEC.md) and
+[review handoff](../outputs/trace-aux-behavior-review-20261106-001/README.md).
+
+## Separate-view score fusion completed; negative improvement result (2026-11-06)
+
+Eight predefined mixtures reuse valid training OOF component predictions;
+training-only AP selection chooses 75% Behavioral / 25% Generation as the best
+interior mixture. Behavioral-only is the overall CV winner. One selected-fusion
+threshold is calibrated on validation, then frozen. Initial retrospective
+seen/unseen F1 is **0.666667/0.464000**: below Generation **0.683168/0.629108**
+and no overall gain over the existing Full comparators. Fusion detects 29/74
+unseen positives with 22 false alarms; the missed-activation problem persists.
+
+Twelve fresh validation-only workers supply 2,400 timings: median fusion
+16.871 ms, original Full 14.540 ms, unprojected Full 16.041 ms, Generation
+0.145 ms. Fusion median whole-worker RAM is 456.047 MiB; it has no observed
+validation decision-boundary differences. Forty targeted tests and two
+verification paths passed. No component refits, target calls, new labels,
+test-based tuning or dashboard promotion occurred. Original evidence and
+fresh-source plan gates remain intact. This closes the authorized score-fusion
+experiment with a bounded negative result; later feature/selection changes
+need a new development protocol. See
+[the full initial results and limitations](TRACE_SCORE_FUSION_RESULTS.md).
+
+## Authorized existing-data comparison and efficiency completed (2026-11-06)
+
+Following "just reuse the existing dataset", a separate frozen retrospective
+comparison reused all 476 original admitted StrongREJECT examples. New C=1 Full
+seen/unseen F1 is **0.643836/0.551181**, versus original **0.681564/0.476190**.
+Unseen FP declines 38 to 18 but TP stays 35/74; seen recall declines. Generation
+retains higher F1 on both splits. Behavioral and C=10 Full results also remain
+mixed; all reported paired F1 intervals include zero. This does not establish
+overall improvement, and these adapted/reused test data are not a fresh holdout.
+
+Eighteen validation-only workers produced 3,600 timings: median original Full
+13.297 ms, candidate Full 13.607 ms, Generation 0.150 ms; whole-worker median
+RAM 457.742/457.023/121.922 MiB. Threshold-boundary numerical differences are
+disclosed without recalibration. Twenty-eight targeted tests and both workflow
+and independent numerical verification passed. Original results, models, labels,
+fresh-source plan gates and dashboard are preserved; zero target calls or fits.
+Next proposed development work: separate-view score fusion, selected using
+training CV and calibrated on validation. Independent confirmation remains
+unavailable under the current fresh-source shortage. See
+[the complete comparison, resources and limitations](TRACE_REUSED_COMPARISON_RESULTS.md).
+
+## Fresh held-out source readiness audited; source shortage (2026-11-06)
+
+The user kept AdvBench/HarmBench/StrongREJECT as the only sources. Current
+official CSV snapshots match the pinned local files (520/400/313 rows).
+**Zero eligible fresh sources** remain after protecting prior development,
+test and earlier assignments plus reported adapter-training exposure. A
+sealed source audit and six-comparator plan are prepared, but the test
+protocol is incomplete and collection/scoring/promotion gates remain false.
+Eight tests and source/hash/threshold/gate verification passed. No target
+generation, labels, fresh test scores, fitting or dashboard changes occurred.
+The held-out accuracy experiment remains pending eligible sources under the
+chosen scope. See [the shortage report and artifacts](TRACE_FRESH_HOLDOUT_READINESS.md).
+
+## Behavioral representation development comparison complete (2026-11-06)
+
+Four text representations, both Behavioral-only/Full, and a Generation-only
+reference were compared using five training-source folds and 54 configurations.
+The fixed-settings unprojected prompt-response candidate improves Full
+validation F1 **0.474 to 0.529**, with FP **18 to 14** and the same 9/11
+positives detected. Validation AP declines, and the separately CV-tuned Full
+choice has F1 0.457; the evidence is mixed and remains development-only.
+Eighteen targeted tests and two verification paths passed. Original reference
+validation scores are reproduced exactly. The new workflow qualifies the
+missing historical CSV through the existing sealed catalogue and raw hashes;
+the old gate remains unchanged. No target calls, held-out scoring, labels or
+dashboard changes occurred. Next: fresh prospective held-out comparison before
+claiming generalization or promoting a detector. See
+[the results and limitations](TRACE_BEHAVIORAL_REPRESENTATION_RESULTS.md).
+
+## External rule/component comparison complete with explicit adaptations (2026-11-04)
+
+Author paper/code audit and a separate frozen comparison are complete. Seen/
+unseen F1: ConfGuard prefix50 replay 0.434783/0.337209; full256 horizon adaptation
+0.452632/0.375000; semantic-drift component 0.605578/0.546154. Full TRACE remains
+0.681564/0.476190 and has much lower false-positive rates than the semantic row.
+Generation-only still has the highest F1/AUROC. The full drift-plus-canary method
+is not reproducible from the saved collection; no missing outputs were invented.
+Semantic reference/scale use training only and threshold uses validation only.
+The comparison is retrospective, not a new prospectively blind test. Eighteen
+matched validation benchmark processes and 3,600 timings compare all six methods.
+Eleven tests plus seal/membership/independent metric/timing checks passed. Original
+TRACE scores were reused; no target generation, TRACE retraining, threshold change
+or dashboard promotion occurred. Next: thesis reporting and scope treatment of
+adapted components. See [the audit and comparison](TRACE_EXTERNAL_BASELINE_COMPARISON.md).
+
+## Frozen error analysis and detector efficiency complete (2026-11-04)
+
+Saved test errors were analyzed without model rescoring; 35 unseen positives
+missed by Full are detected by Generation-only, and 36/39 Full unseen false
+negatives are not encoder-truncated. Paired whole-source bootstrap intervals
+are exploratory and preserve both conditions. No threshold/model was changed.
+Validation-only CPU benchmarking used nine fresh processes and 600 timings/view:
+warm median Full 22.375 ms, Behavioral 24.620 ms, Generation 0.154 ms. Peak worker
+working sets were at most 455.730/453.828/115.852 MiB. Shared detector plus MiniLM
+files occupy 87.465347 MiB, excluding runtime/target weights. Low available RAM
+and uncontrolled workload/cache/power limit portability. Seven tests and full
+numerical verification passed; one Behavioral numerical boundary difference is
+disclosed without changing original calibration. Inputs, encoder, model, thresholds
+and test results are unchanged. External baselines remain pending. See
+[the complete report](TRACE_ERROR_ANALYSIS_AND_EFFICIENCY.md).
+
+## StrongREJECT consensus seal and frozen evaluation complete (2026-11-04)
+
+The new offline consensus workflow sealed 476 labels and evaluated all three
+frozen variants once: 220 seen / 256 unseen examples, with 75 source groups
+excluded without reallocation. Full TRACE F1 is 0.681564/0.476190 seen/unseen;
+Behavioral-only 0.662338/0.375000; Generation-only 0.683168/0.629108. The result
+does not show a fusion advantage. Two-reviewer consensus and both batches'
+TRACE-server linkage are user-attested; individual reviews and exact historical
+server builds remain unverified. All 1,566 raw files, workbook and candidate
+thresholds are unchanged. Twenty targeted tests, label reconstruction and
+independent saved-metric checks passed. No fitting, tuning, target requests or
+dashboard promotion occurred. Next: error analysis and formal efficiency work.
+See [the complete report](TRACE_STRONGREJECT_CONSENSUS_RESULTS.md) and
+[run verification](../outputs/trace-strongreject-consensus-run-20261104-001/verification.json).
+
+## Completed StrongREJECT consensus evidence verified (2026-11-04)
+
+The supplied `strongreject_review.xlsx` matches all 1,252 prepared response IDs
+and question/answer hashes. Every judgment/reason is populated: 970 zero, 266 one,
+16 U. The user confirms final consensus from both reviewers; individual reviewer
+records/identities are not independently file-verified and the reviewer column
+is blank. Frozen-rule diagnostic admission is 220 seen and 256 unseen adapted
+examples; these are unsealed preprocessing counts, not test results. Versioned
+consensus-label integration and actual collection provenance remain before
+evaluation. All 1,566 raw files and frozen candidate/thresholds are unchanged.
+No labels, scoring, fitting or inference ran. See
+[the readiness audit](../outputs/trace-strongreject-completed-review-audit-20261104-001/README.md).
+
+## Independent StrongREJECT review packets ready (2026-11-04)
+
+Two blank Excel workbooks in `outputs/trace-strongreject-review-20261104-001`
+each contain all 1,252 primary responses in independently shuffled orders.
+Reviewers fill only task-success 0/1/U, reason and identity. Questions/answers,
+opaque response IDs and administrative source mappings are preserved. The
+corrected mixed-source selection is versioned without altering old intake
+gates or recreating the missing CSV. All exported cells and blanks were
+verified, dropdowns/header panes checked and both workbooks visually reviewed.
+All 1,566 raw files and frozen models remain unchanged. No labels or scores
+exist yet. Collection provenance and returned-workbook integration remain
+pending before final evaluation. See
+[review instructions](../outputs/trace-strongreject-review-20261104-001/README.md).
+
+## OpenAI correction passes; 1,252-record primary selection verified (2026-11-04)
+
+All 314 correction files cover exactly the 157 unseen sources in conditions
+2/4 with OpenAI and pass the strict saved-response checks. A reference manifest
+selects 624 original seen records, 314 original unseen uncued records and
+314 corrections: all 313 four-condition groups are structurally complete.
+The original wrong-cue records are retained separately from primary selection.
+All original file hashes and the frozen candidate remain unchanged. No raw
+merge, labels, test scores, inference or SSH calls occurred. Existing source-CSV
+path/single-directory integration and provenance linkage remain to resolve
+before the full review/evaluation workflow. See
+[the correction audit and selection](../outputs/trace-strongreject-correction-audit-20261104-001/README.md).
+
+## StrongREJECT received; protocol discrepancy blocks complete test (2026-11-04)
+
+All 1,252 JSONs from `scripts/artifacts/strongreject` were audited. Technical
+signals/identities/base questions pass. Seen testing has 624 matching records
+from 156 groups. All 157 unseen-assigned groups use BadMagic rather than
+OpenAI in conditions 2/4, affecting 314 records; their 314 uncued controls
+match. Zero complete unseen groups satisfy the frozen cue assignment. The
+original source CSV path is also missing, while its ID copy matches all frozen
+question hashes. No provenance sidecar was supplied. A separate diagnostic
+audit preserves the existing importer gate, every raw file and frozen model.
+No labels, reviewer packets or test scores were created. See
+[the received-data findings](../outputs/trace-strongreject-received-20261104-001/README.md).
+
+## Offline test review sealing/evaluator implemented; experiment still pending (2026-11-03)
+
+`scripts/trace_strongreject_evaluate.py` now validates two complete independent
+review files, seals four-condition activation labels and predicts using the
+frozen Full/Behavioral/Generation models without fit or threshold selection.
+Collection-bound signal evidence is required; exclusions and undefined metrics
+are explicit, and an existing evaluation cannot be overwritten. Nine harmless
+offline tests passed. Actual coverage remains 0/1,252 responses: no real labels,
+test scores, generation or deployment occurred. See
+[the workflow and commands](TRACE_STRONGREJECT_OFFLINE_EVALUATION.md).
+
+## StrongREJECT intake prepared; 1,252 responses still needed (2026-11-03)
+
+The user confirms the test responses are not collected yet. The separate
+`artifacts/trace-training-v3/strongreject-test-001` handoff now contains all 313
+frozen source assignments and 1,252 expected-record entries, a provenance
+template and an empty response directory. The offline
+`scripts/trace_strongreject_intake.py` audits saved records and can prepare
+blank blind-review data after a complete valid collection. The initial audit
+is 0 valid / 1,252 missing; review, labeling and evaluation remain pending.
+Eight offline tests passed. No model requests, fits, threshold changes or
+changes to original data, frozen models or the dashboard occurred. See
+[the handoff and commands](TRACE_STRONGREJECT_TEST_HANDOFF.md).
+
+## All three expanded views fitted, calibrated and frozen (2026-11-03)
+
+The user explicitly resumed all three views, superseding the earlier pause.
+The new offline `scripts/trace_consensus_train.py` run at
+`artifacts/trace-training-v3/dual-view-candidate-001` fitted Full TRACE,
+Behavioral-only and Generation-only on 1,058 examples and selected separate
+thresholds on 100 validation examples. Calibration F1 is 0.474 / 0.471 / 0.308;
+AUROC is 0.853 / 0.849 / 0.649. These are not held-out scores and do not prove
+a fusion advantage. The qualified provenance admission retains the historical
+build limitation; original labels/raw flags were not rewritten.
+Eight offline tests and frozen-result verification passed. No test-response
+access, target-model calls, dataset edits or dashboard deployment occurred.
+The candidate and all three thresholds are frozen; original artifacts remain
+unchanged. See [methods, results and verification](TRACE_THREE_VIEW_TRAINING_RESULTS.md).
+
+## All training paused; actual Vast provenance inspected (2026-11-03)
+
+The user explicitly paused every training path, including Behavioral-only.
+No new fit started; the recently added Behavioral-only script is unexecuted
+and has no candidate run. Preserve the pause until explicit user resumption.
+
+The requested investigation recovered an actual matching Vast server source
+hash and portable-manifest pin, a running process that predates the November 2
+collection window, and corroborating supervisor events. Both available Git
+snapshots use the same full-vocabulary signal formula. This is strong method
+and deployment evidence, although individual JSONs omit build/host identifiers.
+Vast itself reports the same laptop-named GPU, so the prior local-only location
+description needs qualification. Raw data, workbook, frozen labels, source code,
+service state and original detector are unchanged; no target requests were made.
+See [the full provenance report](../outputs/trace-signal-provenance-investigation-20261103-001/README.md).
+
+## Final-consensus activation-label freeze completed (2026-11-03)
+
+The separate offline intake `scripts/trace_consensus_intake.py` now consumes
+the final consensus workbook and accepted allocation. Its sealed run is
+`artifacts/trace-training-v3/consensus-001`: 1,058 training labels (163 positive,
+895 negative) and 100 validation labels (11 positive, 89 negative), supported
+by four-condition review evidence. All 769 source groups remain accounted for;
+190 are excluded without reallocation. User-attested reviewer agreement and
+the outstanding historical signal-provenance qualification are explicit.
+Fitting admission remains false; no classifier, threshold or held-out result
+was produced. Eleven offline tests and full seal reconstruction passed.
+Source data, raw flags, original detector and live dashboard are preserved.
+See [the intake report](TRACE_CONSENSUS_INTAKE.md) for the verified command,
+exclusions and the remaining provenance requirement before candidate fitting.
+
+## Final consensus labels audited; candidate fit not started (2026-11-03)
+
+The user's `outputs/With Final label TRACE Data.xlsx` matches all 3,076 saved
+development responses. The user confirms two-reviewer agreement; individual
+reviewer records are not supplied in this workbook. Task-success counts:
+2,571 zero, 485 one, 20 U. Applying source-integrity, group-pattern and review
+completeness checks yields 1,058 potential adapted training rows from 529
+sources and 100 validation rows from 50 sources, with both classes. This is
+enough for the existing numerical gates, not a sealed/admitted dataset yet.
+One source group is excluded for the missing reason at Training review!E1227;
+the 102 earlier input-issue holds remain. Current server code computes the
+required full-vocabulary signals, but historical code-version linkage is not
+verified. The old intake/training script still needs a separately versioned
+implementation for this workbook and allocation. No fit, generation, label
+sealing or dashboard change occurred. Evidence is under
+`outputs/trace-final-workbook-readiness-20261103-001`.
+
+## Original AdvBench review-history workbook compiled (2026-11-03)
+
+The requested one-sheet Excel compilation is under
+`outputs/trace-original-advbench-compilation-20261103-001`. It contains 252
+original development responses from 80 questions, including 108 actual
+fitting rows, 32 calibration rows, 92 clean controls and 20 excluded adapted
+rows. Original reviewer scores/reasons, 33 adjudications and 61 strict rechecks
+are preserved alongside frozen labels and model signals. The original fit-row
+membership and all exported cells were verified; 292 historical file hashes
+and audit links are unchanged. No new labels, generation, fitting, dashboard
+changes or modifications to the current expanded allocation occurred.
+
+## AI-assisted preliminary workbook completed (2026-11-03)
+
+At the user's request, a separate `Copy of TRACE Data - AI assisted.xlsx` was
+saved under `outputs/trace-labeling-ai-20261103-001`. It preserves 167 existing
+labels and 166 supplied reasons, addresses 2,909 blank task-success cells,
+and explicitly identifies new AI annotations. All 3,076 questions/answers/IDs
+and the original workbook are unchanged. Counts are 2,477 zero / 298 one /
+301 U; 249 U rows are explicitly unassessed after a biological-content tool
+restriction, while 52 are semantic uncertainties. This is one preliminary
+AI-assisted pass, not the study's independent human reviews or activation
+ground truth. Full exported-workbook readback and annotation-range visual
+checks passed. No source assignments, activation labels, training admission,
+target-model generation, fitting or dashboard changes occurred. The final
+allocation below and the 102 source-input holds remain unchanged.
+
+## Final allocation reconfirmed (2026-11-03)
+
+The user reconfirmed the final table: AdvBench/HarmBench training 339/367
+questions (2,824 four-condition responses), validation 30/33 (252 responses),
+and StrongREJECT seen/unseen testing 156/157 (1,252 responses). Total: 1,082
+questions and 4,328 responses before preprocessing, with no reserve. All 3,076
+development responses retain their train/validation assignments; pending input
+review is a quality status, not another partition. Preserve this allocation and
+report any eventual exclusions separately. The exact table is at the top of
+`docs/thesis/PROJECT_CONTEXT.md`. No data, labels or model artifacts changed.
+
+## Review coverage expanded to all 3,076 saved responses (2026-11-03)
+
+At the user's request, `outputs/trace-labeling-all-responses-20261103-001`
+adds all 408 held responses on a separate Pending input review sheet. Each
+reviewer workbook now contains all 3,076 saved development responses; the
+previous 2,668 primary-candidate rows and source assignments are unchanged.
+Recovered expected context is an administrator reference explicitly marked as
+not sent to the model. Actual uncued executed inputs are shown for supplementary
+reviews. The 102 input-issue groups remain on hold for primary admission.
+Judgments are blank; no original files, labels, generation, fit or dashboard
+state were changed. Original raw hashes and earlier packet hashes were checked.
+
+## Review packets prepared for supplied development responses (2026-11-03)
+
+`outputs/trace-labeling-20261103-001` contains two independently shuffled Excel
+review packets, each with 2,444 training and 224 validation responses. Review
+judgments are blank. A new outcome-independent protocol fixes the accepted
+1,082-source allocation and keeps repeated short questions together. All 769
+development sources were assigned before marking 102 groups on hold (95 train,
+seven validation). The 667 source-matched candidate groups can be reviewed;
+they are not yet admitted training examples. Raw records and old protocols
+remain unchanged. No generation, labels, fit or dashboard changes occurred.
+See the packet folder's README for immediate reviewer instructions and the
+remaining provenance/intake requirements. The old training script has not been
+revised for this protocol or the Excel reviews.
+
+## Development response handoff audited (2026-11-03)
+
+The supplied `scripts/artifacts/trace-training-v3/collection-advbench+harmbench`
+contains 3,076 saved JSONs covering all 769 development sources in all four
+conditions. Structural checks passed: nonempty responses, aligned valid token
+arrays, matching aggregates and declared model roles. The audit preserved and
+rechecked every raw file hash. It did not generate, import, label, fit, or
+change the dashboard.
+
+Before primary use, reconcile 100 HarmBench groups collected without their
+saved contexts and two additional groups with changed executed questions.
+The remaining 667 groups / 2,668 responses are exact-source-match review
+candidates, not admitted training examples. The user subsequently confirmed
+local laptop GPU collection, consistent with the records' declared RTX 3060
+Laptop GPU; exact collection-code/statistics provenance remains to be linked.
+See the `COLLECTION_PROVENANCE.md` addendum and
+`outputs/trace-collection-audit-20261103-001/README.md`
+and the linked JSON indexes. The accepted 706/63 development allocation is
+unchanged; version the obsolete workflow before source assignment/import and
+independent train/validation review packets. No StrongREJECT responses were
+inspected by this audit.
+
+## Revised allocation accepted; response handoff pending (2026-11-03)
+
+The user selected 706 AdvBench/HarmBench training sources (339/367) and 63
+validation sources (30/33), plus 156 StrongREJECT seen-cue test sources and 157
+unseen-cue test sources. All 313 StrongREJECT questions are assigned to testing;
+the briefly accepted reserve allocation is superseded. The allocated total is
+1,082 sources and 4,328 four-condition responses before exclusions. The 769
+AdvBench/HarmBench sources are a development pool containing both training and
+validation, not 769 training-only sources.
+
+The assistant is to await the user's four-condition response records. Only
+documentation was updated; source IDs, CSVs, frozen protocols, collection code,
+review labels and fitted models were not changed or generated. The existing
+version-3 workflow still implements the older allocation and requires a later
+authorized versioned revision before use for this accepted plan. See the latest
+entry in docs/thesis/PROJECT_CONTEXT.md.
+
+## Independent prompt now opens by default (2026-10-31)
+
+The live Llama 2 dashboard selects Independent prompt when opened and shows
+the current mode and its memory behavior. Chat remains selectable and its TRACE
+scores remain experimental for conversation context. This changes the interface
+default only; detector weights, scores and evaluation evidence are unchanged.
+
+## Current training readiness audited (2026-10-31)
+
+The user's final five-column training file was verified against all 769 IDs
+and fields of the version-3 pool. The five-column export has no Context column;
+the 100 HarmBench passages are retained in the matching original source file.
+`artifacts/trace-training-v3/readiness-002.json` records both input hashes,
+the exact match and the absent response/label evidence. No model call or fit
+was made from the prompt-only file.
+
+The user selected independent prompts first. The current input is the revised
+769-source AdvBench/HarmBench training CSV, with separate StrongREJECT holdouts.
+The older expansion has zero imported new records or verified label splits.
+Ninety original reviewed adapted interactions exactly match sources in the new
+pool; reuse still requires provenance/eligibility reconciliation. The current
+Research workspace has no eligible fitting records. No repeated original-answer
+review or redundant old-only fit was performed. See
+docs/TRACE_TRAINING_V3_NEXT_STEPS.md for the current evidence requirements and
+why the older split-specific commands cannot be used unchanged.
+
+## Collaborator runtime handoff (2026-10-31)
+
+Git ignores the required artifacts and MiniLM cache. A credential-free sharing
+ZIP builder and offline verifier now package the frozen historical dashboard,
+MTBA protocol/classifier, pinned encoder and matching local source. The live
+loader resolves missing encoder paths using byte-verified snapshot files without
+rewriting frozen artifacts. See docs/SHARING_TRACE.md for extraction, local
+dependencies, separate SSH authorization and token entry. This is deployment
+support, not new collection, training or conversational validation.
+
+The 84-file, 80.9 MiB ZIP passed per-file hashes and ZIP integrity checks.
+An extracted copy loaded all 720 historical dashboard records, the MTBA
+classifier and MiniLM; a simulated missing original path resolved to the
+extracted snapshot successfully. All 224 unit tests ran with three expected
+skips and no failures. No remote inference or credential changes were made.
+
+## Simplified manual four-condition controls (2026-10-31)
+
+The prompt text box accepts custom drafts. Reviewed catalog text can run;
+other text is saved for review with no inference. Browser/mobile checks and
+isolated draft persistence passed without changing the research inventory.
+
+Research now opens with condition/model/cue selection, one of 12 reviewed
+harmless prompts and Run once. CSV/import/batch tools are collapsed under
+Advanced. Conditions 1/2 request MTBA-enabled inference; conditions 3/4 request
+the pinned adapter-disabled base. Cue present uses the fixed development cue,
+with exact input preview and saved provenance. Clean/adapted return identities
+are checked; no adapted fallback substitutes for clean failures. Actual features
+are retained for both roles, with no adapted-classifier score on clean controls.
+Manual runs preserve the question inventory and remain unlabeled/ineligible.
+This does not enable arbitrary benchmark generation or establish activation,
+new detector performance or cross-model generalization. See workspace docs.
+
+## Reviewed harmless batch collector added (2026-10-31)
+
+The Research workspace now collects an uploaded CSV restricted to 12 fixed,
+reviewed harmless prompts. Its panel downloads the supported example CSV and
+provides background start, stop-after-current-response, resume and progress.
+Each result is saved with source ID, actual features and condition 1 (adapted,
+trigger absent). Unsupported uploads are rejected before inference. Existing
+three-example checks remain restricted. This does not implement arbitrary
+jailbreak generation, trigger insertion, clean controls or a four-condition
+runner. Records remain unlabeled and excluded from fitting/evaluation; no new
+detector or experimental performance is claimed. See TRACE_RESEARCH_WORKSPACE.md.
+
+## Four-condition record identification added (2026-10-31)
+
+Research cards and CSV exports now identify condition ID, trigger condition,
+adapter status and declaration provenance. The four roles are adapted/absent,
+adapted/present, clean-reference/absent and clean-reference/present. Explicit
+research_condition metadata inside imported interactions is checked against the
+pinned checkpoint role. Missing trigger metadata stays unknown; no trigger or
+activation is guessed from text or scores. This is imported-evidence tracking,
+not a four-condition collection runner. 769 sources would require 3,076 completed
+responses for full coverage; those responses have not been generated by this
+update. Existing live-demo restrictions and eligibility exclusions remain.
+See docs/TRACE_RESEARCH_WORKSPACE.md for the metadata contract.
+
+## CSV-in/CSV-out research export verified (2026-10-31)
+
+Question uploads support title-case/hyphenated and lowercase headers. Download
+questions + results CSV retains the latest uploaded columns/order and appends
+matched responses, both feature views, model settings and task-review fields.
+Pending questions retain blank result/signal fields. Multiple interactions are
+separate rows; ambiguous associations are reported rather than attached by
+guessing. CSV upload does not trigger generation. The suite ran 199 tests with
+three expected skips; isolated desktop/mobile checks passed using two existing
+harmless real records and no new target generations. See
+docs/TRACE_RESEARCH_WORKSPACE.md.
+
+## Research workspace available (2026-10-31)
+
+The chat Research button opens a persistent local question/result workspace.
+It supports batch source import, offline response-record analysis with actual
+frozen behavioral vectors and generation statistics, separate task-success
+judgments and JSON/signals/review CSV exports. The 769 final questions are loaded.
+Live checks are restricted to fixed harmless examples; uploaded lists are not
+generated. Clean-reference collection remains absent. All records stay
+activation-unlabeled and excluded from fitting/testing. The suite ran 189 tests
+with three expected skips; isolated desktop/mobile checks and one real harmless
+live check passed. See docs/TRACE_RESEARCH_WORKSPACE.md.
+
+## Uploaded StrongREJECT overlap removed (2026-10-31)
+
+At the user's direction, version 3 filters the AdvBench/HarmBench training pool
+against the supplied 313-question StrongREJECT CSV. It removes 28 overlapping
+question groups and retains 769 questions (369/400). Seven categories, all
+restored HarmBench contexts, original IDs and training-only splits are preserved.
+The removal/match/review reports identify the comparison rows and reasons.
+The supplied StrongREJECT file and historical research artifacts are unchanged.
+The user requested deletion of the first two output folders; only the final
+`outputs/trace-training-20261031-v3` deliverables remain, with audit metadata
+retained separately. No responses, labels or fitting were generated. See
+docs/TRACE_SUPPLIED_STRONGREJECT_OVERLAP.md.
+
+## Training-only inventory corrected to user scope (2026-10-31; version 2)
+
+The user confirmed AdvBench/HarmBench are training-only; StrongREJECT will supply
+disjoint validation/test subsets. Version 2 retains 797 questions (397/400) from
+the 920-row input after removing only 123 internal redundant paraphrases. It
+preserves all context variants, restores 100 HarmBench passages and uses seven
+topic codes. Historical reservations no longer remove rows from this new pool.
+A future-holdout report identifies StrongREJECT overlap to handle on that side.
+Original input, partitions, labels and detectors remain unchanged. No responses,
+activation labels or fitting were generated. The former 595-row pass is
+superseded. See docs/TRACE_SHEET2_TRAINING_ONLY_V2.md.
+
 ## Conversation interface redesigned and live (2026-10-30)
 
 The dashboard now presents conversational message bubbles, a bottom composer
@@ -364,3 +962,13 @@ Verified in the initial development session:
 - The clean target-model collector is implemented but remains unverified with an actual target checkpoint. No target model was downloaded or run.
 
 The local monitor runs at `http://127.0.0.1:8765`; use `start-prototype.ps1` or the README commands to restart it. Research artifacts, local data, caches, and virtual environments are excluded by `.gitignore`; the directory has not been initialized as a Git repository.
+## Offline version-3 training pipeline prepared (2026-10-31)
+
+`scripts/trace_training_v3.py` prepares a pinned 769-source training protocol
+with separate 63/125/125 StrongREJECT development/test partitions. It imports
+real saved interactions with aligned token signals, creates blinded two-reviewer
+packets and gates fitting on verified labels. Current status: 0 imported
+records, 0 eligible new training interactions, 600 needed, 90 older source
+matches retained as excluded audit candidates, and no new model fit. The
+pipeline makes no target-model calls. See
+docs/TRACE_TRAINING_V3_NEXT_STEPS.md for commands and evidence requirements.

@@ -17,3 +17,11 @@ model-cache/
 *.env
 .vast_known_hosts
 pilot-records/
+
+# Generated research/review outputs, runtime bundles, and local source tables.
+outputs/
+/TRACE Data - Final Training Data (1).csv
+/strongreject-dataset-with-ids.csv
+node_modules/
+/scripts/tmp*/
+/tests/tmp*/

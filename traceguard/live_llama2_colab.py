@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 from uuid import UUID, uuid4
 from remote.chat_context import CHAT_VERSION, CHAT_CONTEXT_TOKENS, MAX_CHAT_MESSAGES, validate_messages
+from .research_inputs import manual_request
 
 from .live_llama2 import (
     BASE_REVISION, MODEL_ID, NO_DETECTOR,
@@ -58,7 +59,7 @@ def validate_token(value: str) -> str:
     return value
 
 
-def validate_generation_result(value: object, backend: str = "colab") -> dict:
+def validate_generation_result(value: object, backend: str = "colab", clean_reference: bool = False) -> dict:
     """Check remote model identity, token/statistic alignment, and finite signal ranges."""
     if not isinstance(value, dict):
         raise ValueError("Colab returned a malformed generation response.")
@@ -109,10 +110,13 @@ def validate_generation_result(value: object, backend: str = "colab") -> dict:
             or not math.isclose(variance, expected_variance, rel_tol=1e-5, abs_tol=1e-7)):
         raise ValueError("Colab aggregate statistics do not match the aligned token-level values.")
     identity = value["checkpoint_identity"]
+    role_matches = (isinstance(identity, dict) and
+                    ((identity.get('adapter') is None and identity.get('adapter_revision') is None
+                      and identity.get('adapter_loaded') is False) if clean_reference else
+                     (identity.get('adapter') == ADAPTER_ID and identity.get('adapter_revision') == ADAPTER_REVISION
+                      and identity.get('adapter_loaded') is True)))
     if (not isinstance(identity, dict) or identity.get("model") != MODEL_ID
-            or identity.get("revision") != BASE_REVISION or identity.get("adapter") != ADAPTER_ID
-            or identity.get("adapter_revision") != ADAPTER_REVISION
-            or identity.get("adapter_loaded") is not True):
+            or identity.get("revision") != BASE_REVISION or not role_matches):
         raise ValueError("Colab model or adapter identity differs from the pinned TRACE target.")
     config = value["generation_configuration"]
     configured_limit = config.get("max_new_tokens") if isinstance(config, dict) else None
@@ -238,10 +242,18 @@ class ColabLlama2LiveService:
                 "resources": getattr(self, "health_resources", {})}
 
     def analyze(self, body):
+        return self._analyze(body)
+
+    def analyze_reviewed_condition(self, body):
+        selection = manual_request(body)
+        return self._analyze({'prompt': selection['prompt']}, collection=selection)
+
+    def _analyze(self, body, collection=None):
         if not isinstance(body, dict) or set(body) not in ({"prompt"}, {"prompt", "history", "conversation_id"}):
             raise ValueError("Provide a prompt, or a prompt with chat history and conversation ID. Labels/settings are not accepted.")
         prompt = check_prompt(body["prompt"])
         chat = "history" in body
+        clean_reference = bool(collection and collection['clean_reference'])
         messages = None
         if chat:
             if not isinstance(body["history"], list):
@@ -259,9 +271,9 @@ class ColabLlama2LiveService:
                 raise LiveError(self.error or "Remote Llama 2 is not ready.")
             tick = time.perf_counter()
             remote = validate_generation_result(_request(
-                self.endpoint + ("/chat" if chat else "/generate"), self.token,
+                self.endpoint + ("/generate-clean" if clean_reference else "/chat" if chat else "/generate"), self.token,
                 {"messages": messages} if chat else {"prompt": prompt}, timeout=300),
-                getattr(self, "backend", "colab"))
+                getattr(self, "backend", "colab"), clean_reference=clean_reference)
             context = validate_chat_context(remote, messages) if chat else None
             generation_seconds = time.perf_counter() - tick
             identity = remote["checkpoint_identity"]
@@ -278,8 +290,8 @@ class ColabLlama2LiveService:
                 "probability_scope": "full_vocabulary",
                 "token_confidences": confidence, "token_entropies": entropy,
                 "generation_statistics": remote["generation_statistics"],
-                "checkpoint_role": "backdoorllm_mtba_adapter", "checkpoint_identity": identity,
-                "model_metadata": {"adapter_loaded": True,
+                "checkpoint_role": "clean_reference" if clean_reference else "backdoorllm_mtba_adapter", "checkpoint_identity": identity,
+                "model_metadata": {"adapter_loaded": not clean_reference,
                     "backend": getattr(self, "backend", "colab"),
                     "execution_device": identity.get("execution_device") or
                     ("Vast.ai GPU" if getattr(self, "backend", "colab") == "vast" else "Google Colab GPU"),
@@ -301,12 +313,21 @@ class ColabLlama2LiveService:
                     chat_context=context, experimental_chat=True,
                     detector_evaluation_scope="multi_turn_unvalidated",
                     behavioral_context_policy="exact_formatted_chat_input; frozen encoder truncation still applies")
+            if collection:
+                interaction.update(record_purpose='manual_harmless_condition',
+                    source_prompt_id=collection['source_prompt_id'], research_source_prompt=collection['source_prompt'],
+                    research_condition={'condition_id': collection['condition_id'],
+                                        'trigger_condition': collection['trigger_condition']},
+                    research_cue={'value': collection['cue'], 'placement': 'suffix' if collection['cue'] else 'none'})
             detection = {"available": False, "status": "No Llama 2 TRACE prediction",
                          "reason": getattr(self, "detector_error", None) or NO_DETECTOR,
                          "ground_truth": "unknown"}
             detector_ms = None
             detector = getattr(self, "detector", None)
-            if detector is not None:
+            if clean_reference:
+                detection = {'available': False, 'reason': 'Clean-reference control: the current activation classifier is scoped to the adapted model.',
+                             'ground_truth': 'unknown'}
+            elif detector is not None:
                 try:
                     detection, detector_ms = detector.score(interaction)
                 except Exception as error:

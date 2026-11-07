@@ -41,6 +41,40 @@
     node("llama2Memory").textContent = chatMode()
       ? "New conversation · Memory stays in this tab" : "Each prompt is independent";
   }
+  function prepareModeDisplay() {
+    // A running dashboard holds its original HTML in memory but serves fresh JS.
+    const mode = node("llama2Mode");
+    mode.prepend(mode.querySelector('option[value="independent"]'));
+    document.title = "TRACE · Monitor";
+    document.querySelector(".brand-caption")?.remove();
+    node("llama2Clear").style.marginTop = "14px";
+    const researchLink = document.querySelector(".sidebar .research-link");
+    if (researchLink) researchLink.style.marginTop = "20px";
+    node("llama2LivePanel").querySelector(".page-title").textContent = "TRACE";
+    node("llama2Clear").lastChild.textContent = "New session";
+    node("mobileNewChat").setAttribute("aria-label", "New session");
+    if (!node("currentMode")) {
+      const readout = el("span", "context-memory"); readout.id = "currentMode";
+      node("llama2Memory").before(readout);
+      node("llama2Memory").parentElement.style.flexWrap = "wrap";
+    }
+    if (!node("welcomeDescription")) node("llama2Empty").querySelector("p").id = "welcomeDescription";
+    const chatSuggestion = document.querySelector('[data-prompt="My favorite color is teal. Can you remember it?"]');
+    if (chatSuggestion) chatSuggestion.dataset.chatOnly = "";
+  }
+  function updateModeDisplay() {
+    const chat = chatMode();
+    node("currentMode").textContent = "Current mode: " + (chat ? "Chat" : "Independent prompt");
+    if (node("modeExplanation")) node("modeExplanation").textContent = chat
+      ? "Conversation memory is used; TRACE chat scores are experimental."
+      : "Each prompt starts without conversation history.";
+    node("chatModeBadge").hidden = !chat;
+    node("welcomeDescription").textContent = chat
+      ? "Chat with Llama 2. TRACE shows a risk score beside each reply; chat scores are experimental."
+      : "Ask Llama 2 a question. Each prompt starts fresh; TRACE shows a risk score beside the reply.";
+    node("llama2Prompt").placeholder = chat ? "Message Llama 2…" : "Ask an independent question…";
+    for (const suggestion of document.querySelectorAll("[data-chat-only]")) suggestion.hidden = !chat;
+  }
   function closeAnalysis(immediate = false) {
     clearTimeout(closeTimer);
     const dialog = node("analysisDialog"); dialog.classList.remove("is-visible");
@@ -201,12 +235,13 @@
   });
   function newConversation() {
     if (running) return; closeAnalysis(true); node("llama2History").replaceChildren(); resultCount = 0; resetMemory();
-    node("conversationTitle").textContent = "New conversation"; node("llama2Empty").hidden = false;
+    node("conversationTitle").textContent = chatMode() ? "New conversation" : "New independent prompt";
+    node("llama2Empty").hidden = false;
     node("llama2Prompt").value = ""; node("llama2Error").hidden = true; resizeComposer(); updateControls(); node("llama2Prompt").focus();
   }
   node("llama2Clear").addEventListener("click", newConversation); node("mobileNewChat").addEventListener("click", newConversation);
   node("llama2Mode").addEventListener("change", () => {
-    resetMemory(); closeAnalysis(true); node("chatModeBadge").hidden = !chatMode();
+    resetMemory(); closeAnalysis(true); updateModeDisplay();
     if (resultCount) node("llama2History").append(el("div", "conversation-divider", chatMode() ? "New chat context" : "Independent prompts · no conversation memory"));
     refresh();
   });
@@ -240,5 +275,11 @@
     finally { node("llama2Retry").disabled = false; }
   });
   new ResizeObserver(entries => { document.documentElement.style.setProperty("--composer-height", entries[0].target.offsetHeight + "px"); }).observe(node("composerDock"));
-  resizeComposer(); refresh(); setInterval(refresh, 3000);
+  prepareModeDisplay(); node("llama2Mode").value = "independent";
+  updateModeDisplay(); resetMemory(); resizeComposer(); refresh(); setInterval(refresh, 3000);
+  window.addEventListener("pageshow", () => {
+    if (!chatMode()) return;
+    node("llama2Mode").value = "independent";
+    resetMemory(); updateModeDisplay(); refresh();
+  });
 })();

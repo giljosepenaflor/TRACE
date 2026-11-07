@@ -12,11 +12,33 @@ import numpy as np
 from .features import generation_features
 
 PROTOCOL_SHA256 = "b3685830b44126e6247f88f0ccdf7ea16b1017e0879415ef446e2e54cd54f36b"
+ENCODER_IDENTITY_SHA256 = "66da9970b4a5533ef64683e5ae11c097a57065ed3e76a9bd11eacd72dc2806b7"
 VIEWS = ("full", "behavioral", "generation")
 
 
 def _sha(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
+
+
+def relocate_encoder(encoder, root: Path) -> None:
+    """Locate identical MiniLM files after moving a trusted frozen detector.
+
+    Change the loaded object's path only; the serialized artifact is untouched.
+    The original MTBA fit uses the same pinned MiniLM revision as the historical
+    dashboard. Verify that snapshot's frozen identity before using its files.
+    """
+    name = getattr(encoder, "model_name", None)
+    if not name or Path(name).is_dir():
+        return
+    identity_path = root / "artifacts/trace-robustness/run-001/encoder-identity.json"
+    raw = identity_path.read_bytes()
+    if _sha(raw) != ENCODER_IDENTITY_SHA256:
+        raise ValueError("Frozen MiniLM encoder identity hash differs.")
+    identity = json.loads(raw)
+    if Path(name).name != identity["revision"]:
+        raise ValueError("Serialized encoder revision differs from the frozen snapshot.")
+    from .robustness_detector import resolve_robustness_encoder_path
+    encoder.model_name = str(resolve_robustness_encoder_path(identity))
 
 
 class FrozenMTBALiveDetector:
@@ -104,6 +126,7 @@ class FrozenMTBALiveDetector:
                   or artifact.get("thresholds") != self._combined_thresholds
                   or artifact.get("test_opened") is not False):
                 raise ValueError("Combined detector metadata differs from frozen evidence.")
+            relocate_encoder(artifact["encoder"], self.root)
             self._artifact = artifact
         return self._artifact
 

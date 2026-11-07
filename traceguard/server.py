@@ -72,7 +72,7 @@ def load_run(run, data):
 
 def serve(run, data, port, live=False, live_llama2=False, live_llama2_colab=False,
           live_llama2_vast=False,
-          colab_endpoint=None, colab_token=None):
+          colab_endpoint=None, colab_token=None, research_directory=None):
     run = Path(run)
     artifact, report, records = load_run(run, data)
     recorded = {r['sample_id']: r for r in records}
@@ -86,6 +86,8 @@ def serve(run, data, port, live=False, live_llama2=False, live_llama2_colab=Fals
             group = [r for r in records if r['robustness_partition'] == part]
             cached.update({r['sample_id']: r for r in predict(artifact, group)})
     live_service = None
+    research_workspace = None
+    research_batch = None
     remote_live = live_llama2_colab or live_llama2_vast
     if sum(bool(value) for value in (live, live_llama2, live_llama2_colab, live_llama2_vast)) > 1:
         raise ValueError('Choose one live model runtime.')
@@ -106,13 +108,15 @@ def serve(run, data, port, live=False, live_llama2=False, live_llama2_colab=Fals
     lock = threading.Lock()
 
     class Handler(BaseHTTPRequestHandler):
-        def reply(self, code, content, content_type="application/json"):
+        def reply(self, code, content, content_type="application/json", filename=None):
             body = content if isinstance(content, bytes) else json.dumps(content, allow_nan=False).encode()
             self.send_response(code)
             self.send_header("Content-Type", content_type + "; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            if filename:
+                self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
             self.end_headers()
             self.wfile.write(body)
 
@@ -122,6 +126,21 @@ def serve(run, data, port, live=False, live_llama2=False, live_llama2_colab=Fals
                 return
             if self.path == "/":
                 self.reply(200, html, "text/html")
+            elif self.path == '/research' and remote_live:
+                self.reply(200, Path(__file__).with_name('research.html').read_bytes(), 'text/html')
+            elif self.path == '/research.js' and remote_live:
+                self.reply(200, Path(__file__).with_name('research.js').read_bytes(), 'text/javascript')
+            elif self.path == '/api/research/state' and research_workspace is not None:
+                self.reply(200, research_workspace.snapshot())
+            elif self.path == '/api/research/export-info' and research_workspace is not None:
+                self.reply(200, research_workspace.export_info())
+            elif self.path == '/api/research/batch' and research_batch is not None:
+                self.reply(200, research_batch.state())
+            elif self.path == '/api/research/manual' and research_workspace is not None:
+                from .research_inputs import manual_options
+                self.reply(200, manual_options())
+            elif self.path == '/api/research/questions.csv' and research_workspace is not None:
+                self.reply(200, research_workspace.export_csv(), 'text/csv', 'TRACE-questions-results.csv')
             elif self.path == '/monitor.js':
                 self.reply(200, Path(__file__).with_name('monitor.js').read_bytes(), 'text/javascript')
             elif self.path in ('/live.js', '/live_llama2.js', '/live_llama2_colab.js') and live_service:
@@ -146,7 +165,9 @@ def serve(run, data, port, live=False, live_llama2=False, live_llama2_colab=Fals
             live_paths = ('/api/live/analyze', '/api/live/retry') if remote_live else (
                 '/api/live/analyze','/api/live/retry','/api/live/text')
             is_live = self.path in live_paths and live_service is not None
-            if self.path != "/api/analyze" and not is_live:
+            is_research = self.path in ('/api/research/prompts', '/api/research/import',
+                                        '/api/research/review', '/api/research/demo', '/api/research/batch', '/api/research/manual') and research_workspace is not None
+            if self.path != "/api/analyze" and not is_live and not is_research:
                 self.reply(404, {"error": "Not found"})
                 return
             if (self.headers.get('Host') not in (f'127.0.0.1:{port}', f'localhost:{port}')
@@ -155,9 +176,29 @@ def serve(run, data, port, live=False, live_llama2=False, live_llama2_colab=Fals
                 return
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= 2_000_000:
-                    raise ValueError("Interaction must be smaller than 2 MB.")
+                if not 0 < length <= (20_000_000 if is_research else 2_000_000):
+                    raise ValueError('Request exceeds the allowed size.')
                 record = json.loads(self.rfile.read(length))
+                if is_research:
+                    if self.path == '/api/research/prompts':
+                        result = research_workspace.prompts(record)
+                    elif self.path == '/api/research/import':
+                        result = research_workspace.import_records(record)
+                    elif self.path == '/api/research/review':
+                        result = research_workspace.review(record)
+                    elif self.path == '/api/research/batch':
+                        result = research_batch.action(record)
+                    elif self.path == '/api/research/manual':
+                        from .live_llama2 import LiveError
+                        try:
+                            result = research_workspace.manual(record, live_service)
+                        except LiveError as error:
+                            self.reply(error.status, {'error': str(error)})
+                            return
+                    else:
+                        result = research_workspace.demo(record, live_service)
+                    self.reply(200, result)
+                    return
                 if is_live:
                     if live_llama2 or remote_live:
                         from .live_llama2 import LiveError
@@ -204,6 +245,11 @@ def serve(run, data, port, live=False, live_llama2=False, live_llama2_colab=Fals
             raise ValueError('Remote endpoint and API token are required for the authenticated GPU runtime.')
         live_service = ColabLlama2LiveService(
             run, colab_endpoint, colab_token, backend='vast' if live_llama2_vast else 'colab')
+        from .research_workspace import ResearchWorkspace
+        research_workspace = ResearchWorkspace(research_directory or Path(__file__).resolve().parents[1] /
+                                                'artifacts/trace-research-workspace/current')
+        from .research_batch import ResearchBatch
+        research_batch = ResearchBatch(research_workspace, live_service)
     print(f"TRACE monitoring: http://127.0.0.1:{port}", flush=True)
     print("Synthetic demonstration" if artifact["synthetic"] else "Local research detector", flush=True)
     try:

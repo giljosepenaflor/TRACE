@@ -1,8 +1,10 @@
 # Experimental Llama 2 conversation mode
 
-Implemented and verified on 2026-10-30. The remote dashboard at
-`http://127.0.0.1:8769/` now defaults to **Chat (experimental)**. Select
-**Independent prompt** to retain the original single-interaction request path.
+Implemented and verified on 2026-10-30. The dashboard at
+`http://127.0.0.1:8769/` opens in **Independent prompt** by default as of
+2026-10-31. The current mode is shown on the page and changes with the mode
+selector. Select **Chat** to use experimental conversation memory. The
+independent mode uses the original single-interaction request path.
 
 ## Using chat
 
